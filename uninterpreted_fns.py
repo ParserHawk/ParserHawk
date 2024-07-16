@@ -1,5 +1,6 @@
 from z3 import *
 
+Color, (red, green, blue) = EnumSort('Color', ('red', 'green', 'blue'))
 f = Function('f', IntSort(), IntSort())
 x, y = Ints('x y')
 
