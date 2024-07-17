@@ -17,6 +17,7 @@ x, y = Ints('x y')
 # just call it an array. That way output is an array of bitstrings.
 # maybe the output is a matrix of bitstrings:
 # the x axis is header name, the y axis is field name
+# To start, output can just be a vector of bitstrings (fields within headers can come next).
 
 solver = Solver()
 solver.add(ForAll([x], f(x) > 0))  # f is always positive
