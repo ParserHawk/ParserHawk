@@ -1,3 +1,4 @@
 # parse differently depending on the value of the 4th bit from left
+# uses three states: first has an extract and select. second has a single extract. third has two extracts.
 00101111 -> ['0000', '1111']
 00111111 -> ['0011', '11', '11']

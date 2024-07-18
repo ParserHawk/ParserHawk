@@ -1,3 +1,4 @@
 # parse unconditionally into two headers of 4 bits each
+# uses: one state with two extracts, or two states with one extract each
 00101111 -> ['0000', '1111']
 00111111 -> ['0011', '1111']
