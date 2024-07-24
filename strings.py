@@ -1,12 +1,13 @@
 from z3 import *
-x = String('x')
+
 solver = Solver()
-solver.add(x.at(0) == "1")
-solver.add(SubString(x, 0, 5) == "12345")
-solver.add(Contains(x, "123456") == True)
-solver.add(Replace(x, "345", "abc") == "12abc6")
-solver.add(SubString(x, 0, 5) == "12345")
-solver.add(Contains(x, "123456") == True)
-solver.add(Replace(x, "345", "abc") == "12abc6")
-solver.check()
+
+bitstream = String('bitstream')
+offset = Int('offset')
+
+solver.add(bitstream == "10001001")
+solver.add(SubString(bitstream, 0, offset) == "1000")
+solver.add(SubString(bitstream, offset, Length(bitstream)) == "1001")
+
+print(solver.check())
 print(solver.model())
