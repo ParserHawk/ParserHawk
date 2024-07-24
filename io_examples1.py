@@ -1,5 +1,18 @@
 from z3 import *
 
+ ### # parse unconditionally into two headers of 4 bits each
+ ### # uses: one state with two extracts, or two states with one extract each
+ ### 10001001 -> ['1000', '1001']
+ ### 11001001 -> ['1100', '1001']
+ ### 
+ ### 
+ ### # DFA for this
+ ### State | Lookup | Extract | Next State |
+ ### ---------------------------------------
+ ### 1     | *      | 0,4     | 2          |
+ ### 2     | *      | 0,4     | END        | 
+
+
 solver = Solver()
 
 bitstream1 = String('bitstream1')
