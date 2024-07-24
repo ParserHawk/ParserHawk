@@ -1,6 +1,0 @@
-It seems like we need sequences of bits to
-model the bitstrings and parsed headers,
-
-as opposed to say strings or bitvectors or ints.
-
-Here is what is supported wrt sequences in Z3: https://microsoft.github.io/z3guide/docs/theories/Sequences/
