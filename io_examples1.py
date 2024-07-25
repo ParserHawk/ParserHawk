@@ -27,6 +27,8 @@ solver.add(bitstream2 == "11001001")
 solver.add(SubString(bitstream2, 0, offset) == "1100")
 solver.add(SubString(bitstream2, offset, Length(bitstream2)) == "1001")
 
-
 print(solver.check())
-print(solver.model())
+m=solver.model()
+print(m[bitstream1])
+print(m[bitstream2])
+print(m[offset])
