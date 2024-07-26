@@ -1,0 +1,4 @@
+1. More input/output examples
+2. Figure out hardware constraints, lookahead 
+3. Haseeb: Look at GG, (https://www.usenix.org/system/files/atc19-fouladi.pdf)
+4. Karan: Read CEGIS tutorial (https://people.csail.mit.edu/asolar/SynthesisCourse/Lecture10.htm#cegis). Figure out how to write the CEGIS loop.
