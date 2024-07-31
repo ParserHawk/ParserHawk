@@ -23,10 +23,11 @@ class TcamRow:
         # a top down verification process, not possible to keep track when creating random tcam rows
 
         # for now, current_header would be sequential 1,2,3...
-        # lookup_val is any random hexadecimal number between 0x1 and 0xA
+        # lookup_val is any random hexadecimal number between 0x1 and 0xA (i.e., a 4 bit match pattern)
         # next_header would be 2,3,4...
-        # extract_len is any random number between 5 to 10
+        # extract_len is any random number between 5 to 10 bytes
         # next_lookup_offset is any random number between 1 to 5 (to ensure legality for the random cases)
+        # current granularity is 1 byte at a time.
 
         t_current_header = cls.current_header_counter
         t_lookup_val = hex(random.randint(0x1, 0xA))
@@ -50,6 +51,10 @@ class ParserTable:
         for _ in range(self.num_rows):
             self.tcam.append(TcamRow.create_random_tcam_row())
 
+    # Todo: Write a validation procedure to check if a parse table is legal
+    def validate(self):
+        pass
+
     # display the parser table as row of dictionaries
     def __str__(self):
         result = []
@@ -59,8 +64,8 @@ class ParserTable:
 
 
 class Parser:
-    def __init__(self, t_bitstring):
-        self.bitstring = t_bitstring
+    def __init__(self, t_bytestream):
+        self.bytestream = t_bytestream
         self.packet_header_vector = []
         self.parser_table = ParserTable(5)
         self.parser_table.create_random_parse_table() # intialise a dummy parser table
@@ -68,6 +73,7 @@ class Parser:
         self.current_row = 0  # to keep track of which tcam row is being processed to finally end the parsing
 
     def execute(self):
+        # TODO: Do a while loop across the bytes in a bytestream until (1) either bytestream is exhausted, (2) failure state is reached, or (3) accept state is reached
         # Logic for now is if parsing fails to go through all tcam entries, it is a failure, otherwise it succeeds
         while self.current_row < len(self.parser_table.tcam):
             if not self.step():
@@ -77,18 +83,20 @@ class Parser:
         print("Packet Header Vector:", self.packet_header_vector)
 
     def step(self):
+        # TODO: While or for loop across entries in TCAM table
         row = self.parser_table.tcam[self.current_row]
-        
-        # Extract part of the bitstring starting from the current cursor position
-        bitstring_segment = self.bitstring[self.cursor:self.cursor + row.extract_len]
+
+        # Assume extract happens before select, like in Figure 1 of the leapfrog paper.
+        # Extract part of the bytestream starting from the current cursor position
+        bytestream_segment = self.bytestream[self.cursor : self.cursor + row.extract_len]
 
         # Extract value from current header to match against the lookup_value
-        to_lookup = bitstring_segment[row.next_lookup_offset: len(row.lookup_val) + row.next_lookup_offset]
+        to_lookup = bytestream_segment[row.next_lookup_offset: len(row.lookup_val) + row.next_lookup_offset]
         
-        # Match the lookup value with the bitstring portion starting from offset specified 
+        # Match the lookup value with the bytestream portion starting from offset specified 
         # (a portion with same length as lookup_val - due to lack of end offset)
         if to_lookup == row.lookup_val:
-            self.packet_header_vector.append(bitstring_segment)
+            self.packet_header_vector.append(bytestream_segment)
             self.cursor += row.extract_len
             self.current_row += 1
             return True
