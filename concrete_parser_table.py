@@ -1,3 +1,6 @@
+# Use Figure 1 from Leapfrog as an example unit test.
+# Specifically, Figure 1 can be used to generate an example parse table for testing.
+
 import random
 
 class TcamRow:
