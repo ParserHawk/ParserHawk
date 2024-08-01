@@ -120,12 +120,13 @@ class Parser:
         
         # didn't find any matching lookups in the parse table => parsing fails
         return False
-        
 
-parser_table = ParserTable(5)
-parser_table.create_random_parse_table()
-print(parser_table)
-print(parser_table.validate())
+       
+if __name__ == '__main__':
+    parser_table = ParserTable(5)
+    parser_table.create_random_parse_table()
+    print(parser_table)
+    print(parser_table.validate())
 
-parser = Parser('0x1ABC97A')
-parser.execute()
+    parser = Parser('0x1ABC97A')
+    parser.execute()
