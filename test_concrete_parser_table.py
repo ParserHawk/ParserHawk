@@ -33,6 +33,8 @@ def create_parser_table():
 
 class TestParserOperation(unittest.TestCase):
 
+    # for the path A->B
+    # parsing success case - check for parse fail or pass
     def test_parsing_1(self):
         parser_table = create_parser_table()
         parser = Parser('2AC1', parser_table)
@@ -42,6 +44,8 @@ class TestParserOperation(unittest.TestCase):
         print("expected_value:", expected_value)
         assert result == expected_value
 
+    # for the path A->B
+    # parsing success case - check for phv values
     def test_phv_1(self):
         parser_table = create_parser_table()
         parser = Parser('2AC1', parser_table)
@@ -52,6 +56,7 @@ class TestParserOperation(unittest.TestCase):
         print("expected_value:", expected_value)
         assert result == expected_value
 
+    # parsing failure case 
     def test_parsing_2(self):
         parser_table = create_parser_table()
         parser = Parser('CCC1234', parser_table)
@@ -61,6 +66,7 @@ class TestParserOperation(unittest.TestCase):
         print("expected_value:", expected_value)
         assert result == expected_value
 
+    # parsing failure but still check the data extraction till point of failure
     def test_phv_2(self):
         parser_table = create_parser_table()
         parser = Parser('CCC1234', parser_table)
@@ -71,6 +77,8 @@ class TestParserOperation(unittest.TestCase):
         print("expected_value:", expected_value)
         assert result == expected_value
 
+    # for the path A->C->D->E
+    # parsing success case - check for parse fail or pass
     def test_parsing_3(self):
         parser_table = create_parser_table()
         parser = Parser('2B671211ABCDE1', parser_table)
@@ -80,6 +88,8 @@ class TestParserOperation(unittest.TestCase):
         print("expected_value:", expected_value)
         assert result == expected_value
 
+    # for the path A->C->D->E
+    # parsing success case - check for phv values
     def test_phv_3(self):
         parser_table = create_parser_table()
         parser = Parser('2B671211ABCDE1', parser_table)
@@ -90,6 +100,8 @@ class TestParserOperation(unittest.TestCase):
         print("expected_value:", expected_value)
         assert result == expected_value
 
+    # for the path A->C->D->F
+    # parsing success case - check for parse fail or pass
     def test_parsing_4(self):
         parser_table = create_parser_table()
         parser = Parser('2B6712017890123', parser_table)
@@ -99,6 +111,8 @@ class TestParserOperation(unittest.TestCase):
         print("expected_value:", expected_value)
         assert result == expected_value
 
+    # for the path A->C->D->F
+    # parsing success case - check for phv values
     def test_phv_4(self):
         parser_table = create_parser_table()
         parser = Parser('2B6712017890123', parser_table)
@@ -109,6 +123,7 @@ class TestParserOperation(unittest.TestCase):
         print("expected_value:", expected_value)
         assert result == expected_value
 
+    # parsing failure case
     def test_parsing_5(self):
         parser_table = create_parser_table()
         parser = Parser('2B671234ABCDEF12', parser_table)
@@ -118,6 +133,7 @@ class TestParserOperation(unittest.TestCase):
         print("expected_value:", expected_value)
         assert result == expected_value
 
+    # parsing failure but still check the data extraction till point of failure
     def test_phv_5(self):
         parser_table = create_parser_table()
         parser = Parser('2B671234ABCDEF12', parser_table)
