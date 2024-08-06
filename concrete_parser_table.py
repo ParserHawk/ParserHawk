@@ -3,17 +3,23 @@
 
 import random
 
-def ternary_match(pattern, data):
-    # Check if lengths match or pattern is longer
-    if len(pattern) != len(data):
+# takes two lists
+def ternary_match_and(patterns, data_list):
+    if(len(data_list) == 0):
+        return True
+
+    if len(patterns) != len(data_list):
         return False
     
-    # Iterate through each character in pattern and data
-    for p_char, d_char in zip(pattern, data):
-        if p_char == '*':
-            continue  # Wildcard matches any character
-        if p_char != d_char:
+    for pattern, data in zip(patterns, data_list):
+        if len(pattern) != len(data):
             return False
+        
+        for p_char, d_char in zip(pattern, data):
+            if p_char == '*':
+                continue  # Wildcard matches any character
+            if p_char != d_char:
+                return False
     
     return True
 
@@ -69,6 +75,8 @@ class ParserTable:
     # Verification process would be possible after the entire table is populated, then we can run
     # a top down verification process, not possible to keep track when creating random tcam rows
     # Write a validation procedure to check if a parse table is legal
+
+    #TODO: Add a validation check to ensure the number of next_offsets are the same as the lookup
     def validate(self):
         offset_validity = None
         present_lookup_offset = self.tcam[0].next_lookup_offset
@@ -106,7 +114,7 @@ class Parser:
         self.cursor = 0
         self.current_row = 0  # to keep track of which tcam row is being processed to finally end the parsing
         self.current_header_to_match = self.parser_table.tcam[0].current_header
-        self.current_lookup_offset = 0
+        self.current_lookup_offset = []
 
     def execute(self):
 
@@ -116,36 +124,43 @@ class Parser:
             if not return_status: # no transitions present - parsing error
                 return 0
             elif(return_status == 1): # transition was present, continue parsing
-                self.cursor += self.parser_table.tcam[self.current_row].extract_len
+                if(self.parser_table.tcam[self.current_row].extract_len != '*'):
+                    self.cursor += int(self.parser_table.tcam[self.current_row].extract_len)
             elif(return_status == 2): # parsing reached accept state
                 return 1
 
 
     def step(self):
 
-
-        for tcam_row_number in range(len(self.parser_table.tcam)):
-            if(self.parser_table.tcam[tcam_row_number].current_header == self.current_header_to_match):
-                # Assume extract happens before select, like in Figure 1 of the leapfrog paper.
-                # Extract part of the bytestream starting from the current cursor position
-                # But what if the parsing fails at the first state itself? Assuming the hdr_length is same in all transition entries for a specific header field
-                bytestream_segment = self.bytestream[self.cursor : self.cursor + self.parser_table.tcam[tcam_row_number].extract_len]
-                self.packet_header_vector.append(bytestream_segment)
-                break
+        extraction_done = False
 
         # While or for loop across entries in TCAM table
         for tcam_row_number in range(len(self.parser_table.tcam)):
             if(self.parser_table.tcam[tcam_row_number].current_header == self.current_header_to_match):
 
-                # Extract value from current header to match against the lookup_value
-                # Match the lookup value with the bytestream portion starting from offset specified 
-                # (a portion with same length as lookup_val - due to lack of end offset)
-                to_lookup = '*'
-                if(self.parser_table.tcam[tcam_row_number].lookup_val != '*'):
-                    self.current_lookup_offset = int(self.current_lookup_offset)
-                    to_lookup = bytestream_segment[self.current_lookup_offset : len(self.parser_table.tcam[tcam_row_number].lookup_val) + self.current_lookup_offset]
+                if(not extraction_done):
+                    # Assume extract happens before select, like in Figure 1 of the leapfrog paper.
+                    # Extract part of the bytestream starting from the current cursor position
+                    # But what if the parsing fails at the first state itself? Assuming the hdr_length is same in all transition entries for a specific header field
 
-                if ternary_match(self.parser_table.tcam[tcam_row_number].lookup_val, to_lookup):
+                    # need to handle case where there is no extraction but there is a plain transition
+                    if(self.parser_table.tcam[tcam_row_number].extract_len != '*'):
+                        bytestream_segment = self.bytestream[self.cursor : self.cursor + int(self.parser_table.tcam[tcam_row_number].extract_len)]
+                        self.packet_header_vector.append(bytestream_segment)
+                        extraction_done = True
+
+                to_lookup_all = []
+                for lookup_offset_index in range(len(self.current_lookup_offset)):
+                    # Extract value from current header to match against the lookup_value
+                    # Match the lookup value with the bytestream portion starting from offset specified 
+                    # (a portion with same length as lookup_val - due to lack of end offset)
+                    to_lookup = '*'
+                    if(self.current_lookup_offset[lookup_offset_index] != '*'):
+                        self.current_lookup_offset[lookup_offset_index] = int(self.current_lookup_offset[lookup_offset_index])
+                        to_lookup = bytestream_segment[self.current_lookup_offset[lookup_offset_index] : len(self.parser_table.tcam[tcam_row_number].lookup_val[lookup_offset_index]) + self.current_lookup_offset[lookup_offset_index]]
+                        to_lookup_all.append(to_lookup)
+
+                if ternary_match_and(self.parser_table.tcam[tcam_row_number].lookup_val, to_lookup_all):
                     if(self.parser_table.tcam[tcam_row_number].next_header == 'accept'):
                         return 2 # to signify an accept state was reached
                     self.current_header_to_match = self.parser_table.tcam[tcam_row_number].next_header
