@@ -13,11 +13,11 @@ def node0(Dist, F, I, s):
                   If(Dist[1] == 1, ZeroExt(1, Extract(7, 5, I)), 
                        If(Dist[2] == 1, ZeroExt(2, Extract(7, 6, I)), 0b0000)))
     s.add(Implies(Dist[0] == 1, F[0] == key_expr))
-    s.add(Implies(F[0] == key_expr, Dist[0] == 1))
+    s.add(Implies(Dist[0] == 0, F[0] != key_expr))
     s.add(Implies(Dist[1] == 1, F[1] == Extract(2, 0,key_expr)))
-    s.add(Implies(F[1] == Extract(2, 0,key_expr), Dist[1] == 1))
+    s.add(Implies(Dist[1] == 0, F[1] != Extract(2, 0,key_expr)))
     s.add(Implies(Dist[2] == 1, F[2] == Extract(1, 0,key_expr)))
-    s.add(Implies(F[2] == Extract(1, 0,key_expr), Dist[2] == 1))
+    s.add(Implies(Dist[2] == 0, F[2] != Extract(1, 0,key_expr)))
     return F
 
 # field0, field1, field2
