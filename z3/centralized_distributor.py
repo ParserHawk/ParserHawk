@@ -63,14 +63,19 @@ I = BitVec('I', 8)
 
 solver = Solver()
 
-# initialize_fields
-random_value = random.randint(0, 4)
-solver.add(field0 == random_value)
-solver.add(field1 == random_value)
-solver.add(field2 == random_value)
-solver.add(field00 == random_value)
-solver.add(field11 == random_value)
-solver.add(field22 == random_value)
+# initialize_fields to avoid overfittiing to path
+random_value_field0 = random.randint(0, 4)
+random_value_field1 = random.randint(0, 3)
+random_value_field2 = random.randint(0, 2)
+random_value_field00 = random.randint(0, 4)
+random_value_field11 = random.randint(0, 3)
+random_value_field22 = random.randint(0, 2)
+solver.add(field0 == random_value_field0)
+solver.add(field1 == random_value_field1)
+solver.add(field2 == random_value_field2)
+solver.add(field00 == random_value_field00)
+solver.add(field11 == random_value_field11)
+solver.add(field22 == random_value_field22)
 
 solver.add(Or(Flag[0] == 1, Flag[0] == 0))
 solver.add(Or(Flag[1] == 1, Flag[1] == 0))
