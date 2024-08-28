@@ -1,4 +1,6 @@
+import random
 from z3 import *
+
 
 """
 spec:
@@ -23,10 +25,13 @@ def node0(Dist, F, I, pos, s):
                            If(And(Dist[1] == 1, pos == 4), Extract(7 - 4, 5 - 4, I),
                               Extract(7 - 5, 5 - 5, I))))))
     post_node0_pos = Int('post_node0_pos')
-    s.add(Implies(Dist[0] == 1, And(F[0] == key_expr_field0, post_node0_pos == 4)))
-    s.add(Implies(Dist[1] == 1, And(F[1] == key_expr_field1, post_node0_pos == 5)))
-    s.add(Implies(And(Dist[0] == 0, Dist[1] == 0), (post_node0_pos == pos)))
-    return F, post_node0_pos
+    new_node0_f0 = If(Dist[0] == 1, key_expr_field0, F[0])
+    new_node0_f1 = If(Dist[1] == 1, key_expr_field1, F[1])
+    post_node0_pos = If(Dist[0] == 1, 4, If(Dist[1] == 1, 5, pos))
+   #  s.add(Implies(Dist[0] == 1, And(F[0] == key_expr_field0, post_node0_pos == 4)))
+   #  s.add(Implies(Dist[1] == 1, And(F[1] == key_expr_field1, post_node0_pos == 5)))
+   #  s.add(Implies(And(Dist[0] == 0, Dist[1] == 0), (post_node0_pos == pos)))
+    return [new_node0_f0, new_node0_f1], post_node0_pos
 
 def node1(Dist, F, I, pos, s):
     pre_F0 = F[0]
@@ -43,17 +48,31 @@ def node1(Dist, F, I, pos, s):
                         If(And(Dist[1] == 1, pos == 3), Extract(7 - 3, 5 - 3, I),
                            If(And(Dist[1] == 1, pos == 4), Extract(7 - 4, 5 - 4, I),
                               pre_F1)))))
-    s.add(Implies(Dist[0] == 1, And(F[0] == key_expr_field10)))
-    s.add(Implies(Dist[1] == 1, And(F[1] == key_expr_field11)))
-    return F
+    new_node1_f0 = If(Dist[0] == 1, key_expr_field10, F[0])
+    new_node1_f1 = If(Dist[1] == 1, key_expr_field11, F[1])
+   #  s.add(Implies(Dist[0] == 1, And(F[0] == key_expr_field10)))
+   #  s.add(Implies(Dist[1] == 1, And(F[1] == key_expr_field11)))
+    return [new_node1_f0, new_node1_f1]
 
 
 # define all fields: field0, field1 (Path dependent)
 field0 = BitVec('field0', 4)
 field1 = BitVec('field1', 3)
 
+solver = Solver()
+# initialize_fields
+random_value1 = random.randint(0, 16)
+solver.add(field0 == random_value1)
+random_value2 = random.randint(0, 8)
+solver.add(field1 == random_value2)
+
+Out_field0 = BitVec('Out_field0', 4)
+Out_field1 = BitVec('Out_field1', 3)
+
 # collect all fields into a list
 Fields = [field0, field1] 
+Out_Fields = [Out_field0, Out_field1]
+
 
 # flagij means whether field j is extracted in node i (Path independent)
 flag00 = Int('flag00')
@@ -64,7 +83,6 @@ flag11 = Int('flag11')
 Flag0 = [flag00, flag01]
 Flag1 = [flag10, flag11]
 
-solver = Solver()
 
 # at most one extraction per node
 solver.add(Sum(Flag0) <= 1)
@@ -85,17 +103,20 @@ solver.add(pos == 0)
 post_node0 = Int('post_node0')
 
 solver.add(I == 0b11110000)
-Fields, post_node0 = node0(Flag0, Fields, I, pos, solver)
-Fields = node1(Flag1, Fields, I, post_node0, solver)
-solver.add(Implies(I == 0b11110000, And(Fields[0] == 0b1111, Fields[1] == 0b000)))
-
+Out_Fields, post_node0 = node0(Flag0, Fields, I, pos, solver)
+# solver.add(Out_Fields[0] == 15)
+Out_Fields = node1(Flag1, Out_Fields, I, post_node0, solver)
+solver.add(Implies(I == 0b11110000, And(Out_Fields[0] == 0b1111, Out_Fields[1] == 0b000)))
+# solver.add(Out_Fields[1] == 0)
+solver.add(Out_field0 == Out_Fields[0])
+solver.add(Out_field1 == Out_Fields[1])
 
 if solver.check() == sat:
     print("Solution found.")
     model = solver.model()
-    print("post_node0 (should be 4) =", model[post_node0])
-    print("field0 = (should be 15) =", model[field0])
-    print("field1 = (should be 0) =", model[field1])
+   #  print("post_node0 (should be 4) =", model[post_node0])
+    print("Out_field0 = (should be 15) =", model[Out_field0])
+    print("Out_field1 = (should be 0) =", model[Out_field1])
     print("flag00 = (should be 1) =", model[flag00])
     print("flag01 = (should be 0) =", model[flag01])
     print("flag10 = (should be 0) =", model[flag10])
