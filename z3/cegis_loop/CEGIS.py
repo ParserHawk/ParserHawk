@@ -1,5 +1,19 @@
 from z3 import *
 
+def partial_implementation(f_coeff, f_bias, x_val, s):
+    O = Int('O')
+    F = Int('F')
+    O = f_coeff * x_val
+    F = O + f_bias
+    return [1]
+
+def impl(coeff, bias, x, s):
+    COEFF = Int('COEFF')
+    BIAS = Int('BIAS')
+    s.add(COEFF == coeff)
+    s.add(BIAS == bias)
+    return COEFF * x + BIAS
+
 def synthesis_step(cexamples):
     print("Enter synthsis phase")
     # Define f(x) = f_coeff * x + f_bias
@@ -15,11 +29,16 @@ def synthesis_step(cexamples):
         print("No counterexamples yet, synthesizing any possible f(x)...")
         return 0, 0
     else:
-        # Add constraints: f(x) should equal g(x) = x + 1 for all counterexamples
         for x_val in cexamples:
-            s.push()
+            # input bit stream I = [0,0,0,0,...0]
+            # Out_spec = spec(I)
+            # Out_impl = impl(I, initial_val_of_input_fields)
+
+            # input_field0_path0 = BitVec('input_field0_path0', 8)
+            # input_field1_path0 = BitVec('input_field1_path0', 4)
+            # input_field2_path0 = BitVec('input_field2_path0', 6)
+            # O = implementation(f_coeff, f_bias, x_val, s)
             s.add(f_coeff * x_val + f_bias == x_val + 1)  # g(x) = x + 1
-            s.pop()
 
     # Check if the constraints are satisfiable
     if s.check() == sat:
@@ -54,7 +73,8 @@ def verification_step(coeff, bias):
     s = Solver()
 
     # Constraint: f(x) = coeff * x + bias should equal g(x) = x + 1
-    s.add(coeff * x + bias != x + 1)  # Find a mismatch between f(x) and g(x)
+    # s.add(coeff * x + bias != x + 1)  # Find a mismatch between f(x) and g(x)
+    s.add(impl(coeff, bias, x, s) != x + 1)
 
     if s.check() == sat:
         model = s.model()
