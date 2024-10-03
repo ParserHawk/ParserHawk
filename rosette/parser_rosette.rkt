@@ -17,7 +17,7 @@
 
 ;; Ternary match function that takes two lists of strings/characters and matches them
 ; TODO: return true on all cases and eliminate this func
-(define (ternary-match-and2 patterns data-list)
+(define (ternary-match-and patterns data-list)
   (define (match-helper patterns data-list)
     
     (cond
@@ -40,15 +40,15 @@
             (let loop ([p-chars (list-ref patterns 0)]
                        [d-chars (list-ref data-list 0)])
               (cond
-                [(empty? p-chars) (upper-loop (list-tail patterns 1) (list-tail data-list 1))] ; If all characters matched, return #t
-                [(char=? (car p-chars) #\*) (loop (cdr p-chars) (cdr d-chars))] ; Skip wildcard characters
-                [(char=? (car p-chars) (car d-chars)) (loop (cdr p-chars) (cdr d-chars))] ; Check if characters match
+                [(empty? p-chars) (upper-loop (cdr patterns) (cdr data-list))] ; If all characters matched, return #t
+                [(equal? (list (car p-chars)) (list #\*)) (loop (cdr p-chars) (cdr d-chars))] ; Skip wildcard characters
+                [(equal? (list (car p-chars)) (list (car d-chars))) (loop (cdr p-chars) (cdr d-chars))] ; Check if characters match
                 [else #f]))] ; Return #f if a mismatch is found
            ))]))
 
   (match-helper patterns data-list))
 
-(define (ternary-match-and patterns data-list) #t)
+; (define (ternary-match-and patterns data-list) #t)
 
 
 ;; Class to represent each row entry in TCAM table
@@ -195,20 +195,19 @@
           (new tcam-row% [current-header (string->list "A")] [lookup-val `(, (string->list "*A"))] [next-header (string->list "B")] [extract-len 3] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
           (new tcam-row% [current-header (string->list "A")] [lookup-val `(, (string->list "*B"))] [next-header (string->list "C")] [extract-len 3] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
           (new tcam-row% [current-header (string->list "B")] [lookup-val `(, (string->list "*"))] [next-header (string->list "accept")] [extract-len 1] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
-          (new tcam-row% [current-header (string->list "C")] [lookup-val `(, (string->list "*"))] [next-header (string->list "accept")] [extract-len 2] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
+          (new tcam-row% [current-header (string->list "C")] [lookup-val `(, (string->list "*"))] [next-header (string->list "D")] [extract-len 2] [next-lookup-offset `(, (string->list "1"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
+          (new tcam-row% [current-header (string->list "D")] [lookup-val `(, (string->list "11"))] [next-header (string->list "E")] [extract-len 4] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
+          (new tcam-row% [current-header (string->list "D")] [lookup-val `(, (string->list "01"))] [next-header (string->list "F")] [extract-len 4] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
+          (new tcam-row% [current-header (string->list "E")] [lookup-val `(, (string->list "*"))] [next-header (string->list "accept")] [extract-len 5] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
+          (new tcam-row% [current-header (string->list "F")] [lookup-val `(, (string->list "*"))] [next-header (string->list "accept")] [extract-len 6] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
           
-          ; (new tcam-row% [current-header "S"] [lookup-val #("*")] [next-header "A"] [extract-len 0] [next-lookup-offset #("0")] [lookup-phv-indices #()] [next-lookup-offsets-phv #()])
-          ; (new tcam-row% [current-header "A"] [lookup-val #("*A")] [next-header "B"] [extract-len 3] [next-lookup-offset #("*")] [lookup-phv-indices #()] [next-lookup-offsets-phv #()])
-          ; (new tcam-row% [current-header "A"] [lookup-val #("*B")] [next-header "C"] [extract-len 3] [next-lookup-offset #("*")] [lookup-phv-indices #()] [next-lookup-offsets-phv #()])
-          ; (new tcam-row% [current-header "B"] [lookup-val #("*")] [next-header "accept"] [extract-len 1] [next-lookup-offset #("*")] [lookup-phv-indices #()] [next-lookup-offsets-phv #()])
-          ; (new tcam-row% [current-header "C"] [lookup-val #("*")] [next-header "accept"] [extract-len 1] [next-lookup-offset #("*")] [lookup-phv-indices #()] [next-lookup-offsets-phv #()])
           )
         ]
-        [parser-table (new parser-table% [tcam my-tcam] [num-rows 1])])
+        [parser-table (new parser-table% [tcam my-tcam] [num-rows 5])])
 
     parser-table))
 
-(define-symbolic ext-len1 ext-len2 ext-len3 ext-len4 ext-len5 integer?)
+(define-symbolic ext-len1 ext-len2 ext-len3 ext-len4 ext-len5 ext-len6 ext-len7 ext-len8 ext-len9 integer?)
 ; (set! a-sym 10)
 ;...
 
@@ -219,17 +218,14 @@
           (new tcam-row% [current-header (string->list "A")] [lookup-val `(, (string->list "*A"))] [next-header (string->list "B")] [extract-len ext-len2] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
           (new tcam-row% [current-header (string->list "A")] [lookup-val `(, (string->list "*B"))] [next-header (string->list "C")] [extract-len ext-len3] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
           (new tcam-row% [current-header (string->list "B")] [lookup-val `(, (string->list "*"))] [next-header (string->list "accept")] [extract-len ext-len4] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
-          (new tcam-row% [current-header (string->list "C")] [lookup-val `(, (string->list "*"))] [next-header (string->list "accept")] [extract-len ext-len5] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
-          ; (new tcam-row% [current-header "S"] [lookup-val #("*")] [next-header "accept"] [extract-len 1] [next-lookup-offset #("*")] [lookup-phv-indices #()] [next-lookup-offsets-phv #()])
-          
-          ; (new tcam-row% [current-header "S"] [lookup-val #("*")] [next-header "A"] [extract-len 0] [next-lookup-offset #("0")] [lookup-phv-indices #()] [next-lookup-offsets-phv #()])
-          ; (new tcam-row% [current-header "A"] [lookup-val #("*A")] [next-header "B"] [extract-len a] [next-lookup-offset #("*")] [lookup-phv-indices #()] [next-lookup-offsets-phv #()])
-          ; (new tcam-row% [current-header "A"] [lookup-val #("*B")] [next-header "C"] [extract-len 3] [next-lookup-offset #("*")] [lookup-phv-indices #()] [next-lookup-offsets-phv #()])
-          ; (new tcam-row% [current-header "B"] [lookup-val #("*")] [next-header "accept"] [extract-len 1] [next-lookup-offset #("*")] [lookup-phv-indices #()] [next-lookup-offsets-phv #()])
-          ; (new tcam-row% [current-header "C"] [lookup-val #("*")] [next-header "accept"] [extract-len 1] [next-lookup-offset #("*")] [lookup-phv-indices #()] [next-lookup-offsets-phv #()])
+          (new tcam-row% [current-header (string->list "C")] [lookup-val `(, (string->list "*"))] [next-header (string->list "D")] [extract-len ext-len5] [next-lookup-offset `(, (string->list "1"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
+          (new tcam-row% [current-header (string->list "D")] [lookup-val `(, (string->list "11"))] [next-header (string->list "E")] [extract-len ext-len6] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
+          (new tcam-row% [current-header (string->list "D")] [lookup-val `(, (string->list "01"))] [next-header (string->list "F")] [extract-len ext-len7] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
+          (new tcam-row% [current-header (string->list "E")] [lookup-val `(, (string->list "*"))] [next-header (string->list "accept")] [extract-len ext-len8] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
+          (new tcam-row% [current-header (string->list "F")] [lookup-val `(, (string->list "*"))] [next-header (string->list "accept")] [extract-len ext-len9] [next-lookup-offset `(, (string->list "*"))] [lookup-phv-indices '()] [next-lookup-offsets-phv '()])
           )
         ]
-        [parser-table (new parser-table% [tcam my-tcam] [num-rows 1])])
+        [parser-table (new parser-table% [tcam my-tcam] [num-rows 5])])
 
     parser-table))
 
@@ -259,7 +255,7 @@
                       [current-lookup-offset '()]))
   
   (define parser2 (new parser%
-                      [bytestream (string->list "2BXQ00")]
+                      [bytestream (string->list "2BXQ0")]
                       [packet-header-vector '()]
                       [parser-table (create-parser-table1)]
                       [cursor 0]
@@ -268,7 +264,43 @@
                       [current-lookup-offset '()]))
 
   (define parser2_sym (new parser%
-                      [bytestream (string->list "2BXQ00")]
+                      [bytestream (string->list "2BXQ0")]
+                      [packet-header-vector '()]
+                      [parser-table (create-symbolic-parser-table1)]
+                      [cursor 0]
+                      [current-row '()]
+                      [current-header-to-match ""]
+                      [current-lookup-offset '()]))
+
+  (define parser3 (new parser%
+                      [bytestream (string->list "2B671211ABCDE1")]
+                      [packet-header-vector '()]
+                      [parser-table (create-parser-table1)]
+                      [cursor 0]
+                      [current-row '()]
+                      [current-header-to-match ""]
+                      [current-lookup-offset '()]))
+
+  (define parser3_sym (new parser%
+                      [bytestream (string->list "2B671211ABCDE1")]
+                      [packet-header-vector '()]
+                      [parser-table (create-symbolic-parser-table1)]
+                      [cursor 0]
+                      [current-row '()]
+                      [current-header-to-match ""]
+                      [current-lookup-offset '()]))
+
+  (define parser4 (new parser%
+                      [bytestream (string->list "2B6712017890123")]
+                      [packet-header-vector '()]
+                      [parser-table (create-parser-table1)]
+                      [cursor 0]
+                      [current-row '()]
+                      [current-header-to-match ""]
+                      [current-lookup-offset '()]))
+
+  (define parser4_sym (new parser%
+                      [bytestream (string->list "2B6712017890123")]
                       [packet-header-vector '()]
                       [parser-table (create-symbolic-parser-table1)]
                       [cursor 0]
@@ -284,6 +316,8 @@
 
   (printf "result1: ~a\n" (send parser execute))
   (printf "result2: ~a\n" (send parser2 execute))
+  (printf "result3: ~a\n" (send parser3 execute))
+  (printf "result4: ~a\n" (send parser4 execute))
   ; (printf "expected-result: ~a\n" expected-value)
 
   ;; Assert that the result matches the expected value
@@ -294,6 +328,8 @@
         (begin
             (assert (equal? (send parser execute) (send parser_sym execute)))
             (assert (equal? (send parser2 execute) (send parser2_sym execute)))
+            (assert (equal? (send parser3 execute) (send parser3_sym execute)))
+            (assert (equal? (send parser4 execute) (send parser4_sym execute)))
             ; (assert (equal? a-sym 11))
             ; (assume (<= (send (list-ref (send (send parser get-parser-table) get-tcam) 1) get-extract-len) 3))
             ; (assume (>= (send (list-ref (send (send parser get-parser-table) get-tcam) 1) get-extract-len) 3))
