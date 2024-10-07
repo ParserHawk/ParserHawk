@@ -3,6 +3,16 @@ from z3 import *
 from bitarray import bitarray
 import random
 
+"""
+spec:
+first 4-bit --> field1
+next 4-bit --> field0
+
+0000 1111 -> field1 == 0000, field0 == 1111
+1111 0000 -> field1 == 1111, field0 == 0000
+
+"""
+
 def node0(Dist, F, I, idx, s):
     key_expr_field0 = Extract(7, 4, I)
     key_expr_field1 = Extract(7, 4, I)
@@ -45,6 +55,17 @@ def implementation(Flag0, Flag1, Input_bitstream, idx, initial_f0, initial_f1, s
     Out_Fields = node1(Flag1, Out_Fields, temp_bv, idx_after_node0, s)
     return Out_Fields
 
+# Input_bitstream is a bitVec var in z3
+# TODO: should generate the specification automatically
+def specification(Input_bitstream, initial_f0, initial_f1):
+    # out_field1 = BitVec(f'out_field0_{I_val}', 4)
+    O_field0 = Extract(3, 0, Input_bitstream)
+    idx0 = 1
+    O_field1 = If(Extract(0, 0, O_field0) == 1, Extract(7, 4, Input_bitstream), Extract(7, 4, Input_bitstream))
+    idx1 = If(Extract(0, 0, O_field0) == 1, 1, 1)
+    return [O_field0, O_field1], [idx0, idx1]
+
+# This function is used for formatting purpose
 def get_int_representation(l):
     ret_l = []
     for mem in l:
@@ -55,7 +76,7 @@ def get_int_representation(l):
     return ret_l
 
 def spec(Input_bitstream):
-    # l = [int(Input_bitstream[0 : 4], 2), int(Input_bitstream[4 : 8], 2)]
+    # l = [int(Input_bitstream[0 : 4], 2), int(Input_bitstream[4 : 8], 2)
     l = [int(Input_bitstream[4 : 8], 2), int(Input_bitstream[0 : 4], 2)]
     return l
 
@@ -150,11 +171,12 @@ def verification_step(flag00_value, flag10_value, flag01_value, flag11_value):
     s.add(flag11 == flag11_value)
     idx = Int('idx')
     s.add(idx == 0)
-    # These initial values do not affect the final outcome
-    initial_f0 = 0
-    initial_f1 = 0
-    O = implementation(Flag0, Flag1, x, idx, initial_f0, initial_f1, s)
-    s.add(Or(O[0] != Extract(3, 0, x), O[1] != Extract(7, 4, x))  )  # Find a mismatch between f(x) and g(x)
+    # TODO: sometimes, these initial values may affect the final outcome
+    initial_f0 = random.randint(0, 2**4 - 1)
+    initial_f1 = random.randint(0, 2**4 - 1)
+    O_Impl = implementation(Flag0, Flag1, x, idx, initial_f0, initial_f1, s)
+    O_Spec, Modify_idx = specification(x, initial_f0, initial_f1)
+    s.add(Or(And(O_Impl[0] != O_Spec[0], Modify_idx[0] == 1), And(O_Impl[1] != O_Spec[1], Modify_idx[1] == 1)))  # Find a mismatch between f(x) and g(x)
 
     if s.check() == sat:
         model = s.model()
@@ -163,7 +185,14 @@ def verification_step(flag00_value, flag10_value, flag01_value, flag11_value):
         return None  # No counterexample found, the candidate function is valid
 
 def cegis_loop():
-    cexamples = [0] # Start with no counterexamples
+    cexamples = [0] # Start with one counterexamples  
+    # 0000 0000 
+    # impl:
+    # first 4-bit --> field0
+    # next 4-bit --> field1
+    # spec:
+    # first 4-bit --> field1
+    # next 4-bit --> field0
     maxIter = 10 # Alternatively, we can set it to be # input space.
     for i in range(maxIter):
         print("")
