@@ -58,14 +58,14 @@ def specification(Input_bitstream, initial_field_val_list):
 # Output: updated fields' value in int type
 def spec(Input_bitstream, initial_list):
     # l = [int(Input_bitstream[0 : 4], 2), int(Input_bitstream[4 : 8], 2)
-    Fields = ["", "", ""]
+    Fields = ["" for _ in range(num_pkt_fields)]
     Fields[0] = Input_bitstream[0 : 8]
     if Fields[0][4 : 8] == "1111":
         Fields[1] = Input_bitstream[8 : 8 + 4]
     elif Fields[0][4 : 8] == "0011":
         Fields[2] = Input_bitstream[8 : 8 + 6]
     l = []
-    for i in range(len(Fields)):
+    for i in range(num_pkt_fields):
         if Fields[i] != "":
             l.append(int(Fields[i], 2))
         else:
@@ -279,24 +279,39 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                                                                                                          num_pkt_fields=num_pkt_fields, testcaseID=testcaseID)
     s.add(temp_constraint)
 
-    # Input_Fields = [input_field0, input_field1]
-    Out_Fields, post_pos, idx_after_node0, post_extract_status = node0(Flags[0], Input_Fields, Input_bitstream, 
-                                    idx=idx, pos=pos, alloc_matrix=alloc_matrix, Lookahead=Lookahead, 
-                                    key_val_list=key_val_2D_list[0], tran_idx_list=tran_idx_2D_list[0], 
-                       default_idx_node=default_idx_node_list[0], extract_status=extract_status, s=s)
-    s.add(post_extract_status[0] == 1)
-    Out_Fields, post_pos, idx_after_node1, post_extract_status = node1(Flags[1], Out_Fields, Input_bitstream, 
-                       idx=idx_after_node0, pos=post_pos, alloc_matrix=alloc_matrix, Lookahead=Lookahead, 
-                       key_val_list=key_val_2D_list[1], tran_idx_list=tran_idx_2D_list[1], 
-                       default_idx_node=default_idx_node_list[1], extract_status=post_extract_status, s=s)
-    Out_Fields, post_pos, idx_after_node2, post_extract_status = node2(Flags[2], Out_Fields, Input_bitstream, 
-                       idx=idx_after_node1, pos=post_pos, alloc_matrix=alloc_matrix, Lookahead=Lookahead, 
-                       key_val_list=key_val_2D_list[2], tran_idx_list=tran_idx_2D_list[2], 
-                       default_idx_node=default_idx_node_list[2], extract_status=post_extract_status, s=s)
-    Out_Fields, post_pos, idx_after_node3, post_extract_status = node3(Flags[3], Out_Fields, Input_bitstream, 
-                       idx=idx_after_node2, pos=post_pos, alloc_matrix=alloc_matrix, Lookahead=Lookahead, 
-                       key_val_list=key_val_2D_list[3], tran_idx_list=tran_idx_2D_list[3], 
-                       default_idx_node=default_idx_node_list[3], extract_status=post_extract_status, s=s)
+    # Using for loop to replace the iterative accessing the node function
+    nodes = [] # list of function names
+    for i in range(num_parser_nodes):
+        node_function = globals()[f'node{i}']  # Access the function dynamically by its name
+        nodes.append(node_function)
+    Out_Fields = Input_Fields
+    post_extract_status=extract_status
+    post_pos = pos
+    for i in range(len(nodes)):
+        Out_Fields, post_pos, idx, post_extract_status = nodes[i](Flags[i], Out_Fields, Input_bitstream, 
+                                                                    idx=idx, pos=post_pos, alloc_matrix=alloc_matrix, 
+                                                                    Lookahead=Lookahead, 
+                                                                    key_val_list=key_val_2D_list[i], 
+                                                                    tran_idx_list=tran_idx_2D_list[i], 
+                                                                    default_idx_node=default_idx_node_list[i], 
+                                                                    extract_status=post_extract_status, s=s)
+        
+    # Out_Fields, post_pos, idx_after_node0, post_extract_status = node0(Flags[0], Input_Fields, Input_bitstream, 
+    #                                 idx=idx, pos=pos, alloc_matrix=alloc_matrix, Lookahead=Lookahead, 
+    #                                 key_val_list=key_val_2D_list[0], tran_idx_list=tran_idx_2D_list[0], 
+    #                    default_idx_node=default_idx_node_list[0], extract_status=extract_status, s=s)
+    # Out_Fields, post_pos, idx_after_node1, post_extract_status = node1(Flags[1], Out_Fields, Input_bitstream, 
+    #                    idx=idx_after_node0, pos=post_pos, alloc_matrix=alloc_matrix, Lookahead=Lookahead, 
+    #                    key_val_list=key_val_2D_list[1], tran_idx_list=tran_idx_2D_list[1], 
+    #                    default_idx_node=default_idx_node_list[1], extract_status=post_extract_status, s=s)
+    # Out_Fields, post_pos, idx_after_node2, post_extract_status = node2(Flags[2], Out_Fields, Input_bitstream, 
+    #                    idx=idx_after_node1, pos=post_pos, alloc_matrix=alloc_matrix, Lookahead=Lookahead, 
+    #                    key_val_list=key_val_2D_list[2], tran_idx_list=tran_idx_2D_list[2], 
+    #                    default_idx_node=default_idx_node_list[2], extract_status=post_extract_status, s=s)
+    # Out_Fields, post_pos, idx_after_node3, post_extract_status = node3(Flags[3], Out_Fields, Input_bitstream, 
+    #                    idx=idx_after_node2, pos=post_pos, alloc_matrix=alloc_matrix, Lookahead=Lookahead, 
+    #                    key_val_list=key_val_2D_list[3], tran_idx_list=tran_idx_2D_list[3], 
+    #                    default_idx_node=default_idx_node_list[3], extract_status=post_extract_status, s=s)
     return Out_Fields
 
 # Generate Flag variables
@@ -525,7 +540,7 @@ def verification_step(model, cexamples):
 
 def cegis_loop():
     # Start with one counterexamples  
-    cexamples = [[0,0,0,0]]
+    cexamples = [[0 for _ in range(num_pkt_fields + 1)]]
     # Set the iteration bound
     maxIter = 100
     for i in range(maxIter):
