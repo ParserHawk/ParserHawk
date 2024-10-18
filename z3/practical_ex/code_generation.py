@@ -165,12 +165,13 @@ def codegen(json_obj, number_of_parser_nodes, size_of_key):
         elif v.find("ahead") != -1:
             pattern = r"node(\d+)_ahead(\d+)"
             match = re.search(pattern, v)
-            print("v =", v)
-            print("match =", match)
+            if data[v] != 1:
+                continue
+            # print("match =", match)
             if match: 
                 nodeID = int(match.group(1))
                 aheadBit = int(match.group(2))
-                print("nodeID =", nodeID, "aheadBit =", aheadBit)
+                # print("nodeID =", nodeID, "aheadBit =", aheadBit)
                 if "Tran_key" not in node_list[nodeID]:
                     node_list[nodeID]["Tran_key"] = []
                 node_list[nodeID]["Tran_key"].append("lookahead" + " "+str(aheadBit)+" ")
@@ -178,8 +179,8 @@ def codegen(json_obj, number_of_parser_nodes, size_of_key):
     for i in range(number_of_parser_nodes):
         if len(node_list[i]['Tran_key']) != 0:
             node_list[i]['Tran_key'] = custom_sort(node_list[i]['Tran_key'])
-            if len(node_list[i]['Tran_key']) > size_of_key:
-                node_list[i]['Tran_key'] = node_list[i]['Tran_key'][-size_of_key : ]
+            # if len(node_list[i]['Tran_key']) > size_of_key:
+            #     node_list[i]['Tran_key'] = node_list[i]['Tran_key'][-size_of_key : ]
     
     # TODO: generate the impl python file
     # python_gen_str = get_impl_python(node_list=node_list)
