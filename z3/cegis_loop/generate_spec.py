@@ -1,0 +1,88 @@
+import json
+
+FILENAME = "tmp/simple_parser.json"
+
+'''
+Makes it easy to access data by name
+'''
+def make_named_dict(data):
+    res = {}
+    for d in data:
+        res[d["name"]] = d
+    return res
+
+def dfs(curr, offset, parser, headers, header_types, states, input, initial_list, result):
+    # Extract header from the curr state -- may contain multiple fields
+    st = states[curr]
+    assert len(st["parser_ops"]) == 1, "Exactly one op supported yet!"
+    op = st["parser_ops"][0]
+    assert op["op"] == "extract", "Only `extract` op support yet!"
+
+    assert len(op["parameters"]) == 1, "Exactly one param supported yet!"
+    param = op["parameters"][0]
+
+    hdr_name = param["value"]
+    hdr_type_info = header_types[headers[hdr_name]["header_type"]]
+    fields = hdr_type_info["fields"]
+
+    for f in fields:
+        result[f"{hdr_name}.{f[0]}"] = input[offset:offset+f[1]]
+        offset += f[1]
+    
+    # Handle transitions from curr state and recurse
+    assert len(st["transition_key"]) <= 1, "Upto 1 transition keys supported"
+    key = None
+    if len(st["transition_key"]) > 0:
+        transition_key_val = st["transition_key"][0]["value"]
+        key = f"{transition_key_val[0]}.{transition_key_val[1]}"
+
+    for t in st["transitions"]:
+        assert t["mask"] == None, "Not accounting for mask right now"
+        assert t["type"] in ["hexstr", "default"], f"Only hex type supported yet, found {t['type']}"
+
+        if t["type"] == "default":
+            next_st = t["next_state"]
+            if next_st == None: continue
+            dfs(next_st, offset, parser, headers, header_types, states, input, initial_list, result)
+            continue
+
+        assert key != None, "A non default state found, but no transition key was found"
+        int_value = int(t["value"], 16)
+        if int_value == int(result[key], 2):
+            next_st = t["next_state"]
+            dfs(next_st, offset, parser, headers, header_types, states, input, initial_list, result)
+
+
+def generate(p4, input, initial_list):
+    all_parsers     = p4["parsers"]
+    headers         = make_named_dict(p4["headers"])
+    header_types    = make_named_dict(p4["header_types"])
+
+    assert len(all_parsers) == 1, "Exactly 1 parser supported yet!"
+
+    parser = all_parsers[0]
+    states = make_named_dict(parser["parse_states"])
+
+    curr = parser["init_state"]
+    offset = 0
+    result = {}
+
+    dfs(curr, offset, parser, headers, header_types, states, input, initial_list, result)
+
+    return result
+
+
+def read_json_and_generate(input, initial_list):
+    with open(FILENAME) as file:
+        p4 = json.load(file)
+    
+    return generate(p4, input, initial_list)
+
+def main():
+    input1 = "000000000000000010101010"  # 16 0s and 8 bits of alternating 1 and 0
+    input2 = "000000000000000110101010"  # 15 0s and a 1 and then 8 bits of alterating 1 and 0
+    fields = read_json_and_generate(input1, ['x', 'x', 'x'])
+    for name in fields:
+        print(f"{name} => {fields[name]}")
+
+main()
