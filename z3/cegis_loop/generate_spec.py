@@ -34,7 +34,7 @@ def dfs(curr, offset, parser, headers, header_types, states, input, result):
     result += [res]
 
     # Handle transitions from curr state and recurse
-    assert len(st["transition_key"]) <= 1, "Upto 1 transition keys supported"
+    assert len(st["transition_key"]) <= 1, "Upto 1 transition keys supported"  # TODO: can be a tuple on fields
     key = None
     if len(st["transition_key"]) > 0:
         transition_key_val = st["transition_key"][0]["value"]
@@ -55,7 +55,7 @@ def dfs(curr, offset, parser, headers, header_types, states, input, result):
         if int_value == int(res[key], 2):
             next_st = t["next_state"]
             dfs(next_st, offset, parser, headers, header_types, states, input, result)
-            continue  # Only one match can happen, right?
+            break  # Only one match can happen, right?
 
 def generate(p4, input):
     all_parsers     = p4["parsers"]
