@@ -1,10 +1,18 @@
 from generate_spec import read_json_and_generate
+from colorama import Fore, Style
 
 def run(input, filename):
     result = read_json_and_generate(input, filename)
     for hdr in result:
         for field in hdr:
             print(f"{field} => {hdr[field]}")
+    return result
+
+def verify(res, expected):
+    assert(len(res) == len(expected))
+    for hdr in res:
+        assert hdr in expected
+    print(Fore.GREEN + "Passed" + Style.RESET_ALL)
 
 def test1():
     filename = "tmp/simple_parser.json"
@@ -26,29 +34,64 @@ def test2():
     zero_width8 = "00000000"
     one_width8 = "00000001"
 
+    count = 0
     print("--------- Test (Expected: ethernet, ipv4, a) ---------")
     input = zero_width16 + zero_width8 + one_width8
-    run(input, filename)
+    res = run(input, filename)
+    verify(res, [
+        {"ethernet.etherType": zero_width16},
+        {"ipv4.version": zero_width8},
+        {"a.val": one_width8},
+    ])
+    count += 1
 
     print("--------- Test (Expected: ethernet, ipv6, b) ---------")
     input = one_width16 + zero_width16 + one_width8
-    run(input, filename)
+    res = run(input, filename)
+    verify(res, [
+        {"ethernet.etherType": one_width16},
+        {"ipv6.version": zero_width16},
+        {"b.wal": one_width8},
+    ])
+    count += 1
 
     print("--------- Test (Expected: ethernet) ---------")
     input = two_width16 + zero_width16 + one_width8
-    run(input, filename)
+    res = run(input, filename)
+    verify(res, [
+        {"ethernet.etherType": two_width16},
+    ])
+    count += 1
 
     print("--------- Test (Expected: ethernet, ipv4, a, a, a) ---------")
     input = zero_width16 + zero_width8 + zero_width8 + zero_width8 + one_width8
-    run(input, filename)
+    res = run(input, filename)
+    verify(res, [
+        {"ethernet.etherType": zero_width16},
+        {"ipv4.version": zero_width8},
+        {"a.val": zero_width8},
+        {"a.val": zero_width8},
+        {"a.val": one_width8},
+    ])
+    count += 1
 
     print("--------- Test (Expected: ethernet, ipv6, b, b, b, b, b) ---------")
     input = one_width16 + zero_width16 + zero_width8 + zero_width8 + zero_width8 + zero_width8 + one_width8
-    run(input, filename)
+    res = run(input, filename)
+    verify(res, [
+        {"ethernet.etherType": one_width16},
+        {"ipv6.version": zero_width16},
+        {"b.wal": zero_width8},
+        {"b.wal": zero_width8},
+        {"b.wal": zero_width8},
+        {"b.wal": zero_width8},
+        {"b.wal": one_width8},
+    ])
+    count += 1
+    print(Fore.GREEN + f"{count}/{count} Passed." + Style.RESET_ALL)
 
 
 def main():
-    # test1()
     test2()
 
 if __name__ == "__main__":
