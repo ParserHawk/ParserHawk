@@ -380,7 +380,7 @@ def flag_gen(num_parser_nodes, num_pkt_fields):
     for i in range(num_parser_nodes):  
         flag_row = []  
         for j in range(num_pkt_fields):  
-            flag_row.append(BitVec(f'flag_{i}_{j}'))  # Dynamically create variable names
+            flag_row.append(BitVec(f'flag_{i}_{j}', 1))  # Dynamically create variable names
         Flags.append(flag_row)  # Append the row to the Flags list
 
     return Flags
@@ -460,11 +460,6 @@ def synthesis_step(cexamples):
     for i in range(num_parser_nodes):
         # e.g., s.add(Sum(Flag[0]) <= 1)
         s.add(Sum(Flags[i]) <= 1)
-
-    # Add constraints for each element being 0 or 1
-    for i in range(num_parser_nodes):
-        for j in range(num_pkt_fields):
-            s.add(Or(Flags[i][j] == 0, Flags[i][j] == 1))
 
     idx = Int('idx')
     s.add(idx == 0)
