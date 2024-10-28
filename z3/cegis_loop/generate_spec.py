@@ -95,3 +95,6 @@ def read_json_and_generate(input, filename):
         p4 = json.load(file)
 
     return generate(p4, input)
+
+
+# TODO: mention the commit I used for p4c and expose both functions (json and p4)
