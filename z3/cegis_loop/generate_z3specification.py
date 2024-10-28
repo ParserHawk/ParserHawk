@@ -1,4 +1,5 @@
 import json
+from z3 import BitVec, Extract, If, And, BitVecVal
 
 '''
 Makes it easy to access data by name
@@ -12,7 +13,7 @@ def make_named_dict(data):
 '''
 DFS: Extracts field from a state and transitions to the next state
 '''
-def dfs(curr, offset, headers, header_types, states, input, result):
+def dfs(curr, offset, headers, header_types, states, input, result, z3_result):
     # Extract header from the curr state -- may contain multiple fields
     st = states[curr]
     assert len(st["parser_ops"]) == 1, "Exactly one op supported yet!"
@@ -60,7 +61,7 @@ def dfs(curr, offset, headers, header_types, states, input, result):
         if t["type"] == "default":
             next_st = t["next_state"]
             if next_st == None: continue
-            dfs(next_st, offset, headers, header_types, states, input, result)
+            dfs(next_st, offset, headers, header_types, states, input, result, z3_result)
             continue
 
         assert (len(keys) > 0), "A non default state found, but no transition key was found"
@@ -68,7 +69,7 @@ def dfs(curr, offset, headers, header_types, states, input, result):
         int_value = int(t["value"], 16)
         if int_value == int(''.join(vals), 2):
             next_st = t["next_state"]
-            dfs(next_st, offset, headers, header_types, states, input, result)
+            dfs(next_st, offset, headers, header_types, states, input, result, z3_result)
             break  # Only one match can happen, right?
 
 def generate(p4, input):
@@ -84,8 +85,9 @@ def generate(p4, input):
     curr = parser["init_state"]
     offset = 0
     result = []
+    z3_result = []
 
-    dfs(curr, offset, headers, header_types, states, input, result)
+    dfs(curr, offset, headers, header_types, states, input, result, z3_result)
 
     return result
 
