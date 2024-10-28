@@ -28,17 +28,30 @@ def dfs(curr, offset, parser, headers, header_types, states, input, result):
 
     res = {}
     for f in fields:
-        res[f"{hdr_name}.{f[0]}"] = input[offset:offset+f[1]]
+        k = f"{hdr_name}.{f[0]}"
+        v = input[offset:offset+f[1]]
+        res[k] = v
         offset += f[1]
-    
-    result += [res]
+
+        tmp = {}
+        tmp[k] = v
+        result += [tmp]
 
     # Handle transitions from curr state and recurse
-    assert len(st["transition_key"]) <= 1, "Upto 1 transition keys supported"  # TODO: can be a tuple on fields
-    key = None
-    if len(st["transition_key"]) > 0:
-        transition_key_val = st["transition_key"][0]["value"]
-        key = f"{transition_key_val[0]}.{transition_key_val[1]}"
+
+    # get transition key(s)
+    keys = []
+    for k in st["transition_key"]:
+        transition_key_val = k["value"]
+        keys += [f"{transition_key_val[0]}.{transition_key_val[1]}"]
+
+    # get val(s) of transition key(s) -- assuming that the input bitstream is binary
+    vals = []
+    for k in keys:
+        if k not in res or res[k] == '':
+            print("Input bitstream malformed. ", f"{k} not found")
+            exit(1)
+        vals += [res[k]]
 
     for t in st["transitions"]:
         assert t["mask"] == None, "Not accounting for mask right now"
@@ -50,9 +63,10 @@ def dfs(curr, offset, parser, headers, header_types, states, input, result):
             dfs(next_st, offset, parser, headers, header_types, states, input, result)
             continue
 
-        assert key != None, "A non default state found, but no transition key was found"
+        assert (len(keys) > 0), "A non default state found, but no transition key was found"
+
         int_value = int(t["value"], 16)
-        if int_value == int(res[key], 2):
+        if int_value == int(''.join(vals), 2):
             next_st = t["next_state"]
             dfs(next_st, offset, parser, headers, header_types, states, input, result)
             break  # Only one match can happen, right?
