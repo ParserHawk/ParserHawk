@@ -16,34 +16,30 @@ Node1:
 extract(field1); // bit<3> field1;
 """
 
-def node0(Dist, F, I, pos, idx, s):
-    key_expr_field0 = If(And(Dist[0] == 1, pos == 0), Extract(7, 4, I), 
-                  If(And(Dist[0] == 1, pos == 1), Extract(7 - 1, 4 - 1, I),
-                     If(And(Dist[0] == 1, pos == 2), Extract(7 - 2, 4 - 2, I),
-                        If(And(Dist[0] == 1, pos == 3), Extract(7 - 3, 4 - 3, I),
-                           If(And(Dist[0] == 1, pos == 4), Extract(7 - 4, 4 - 4, I),
-                              Extract(7 - 4, 4 - 4, I))))))
-    key_expr_field1 = If(And(Dist[1] == 1, pos == 0), Extract(7, 5, I), 
-                  If(And(Dist[1] == 1, pos == 1), Extract(7 - 1, 5 - 1, I),
-                     If(And(Dist[1] == 1, pos == 2), Extract(7 - 2, 5 - 2, I),
-                        If(And(Dist[1] == 1, pos == 3), Extract(7 - 3, 5 - 3, I),
-                           If(And(Dist[1] == 1, pos == 4), Extract(7 - 4, 5 - 4, I),
-                              Extract(7 - 5, 5 - 5, I))))))
-    new_node0_f0 = If(And(idx == 0, Dist[0] == 1), key_expr_field0, F[0])
-    new_node0_f1 = If(And(idx == 0, Dist[1] == 1), key_expr_field1, F[1])
-    post_node0_pos = If(idx == 0, If(Dist[0] == 1, 4, If(Dist[1] == 1, 5, pos)), pos)
-   #  s.add(Implies(Dist[0] == 1, And(F[0] == key_expr_field0, post_node0_pos == 4)))
-   #  s.add(Implies(Dist[1] == 1, And(F[1] == key_expr_field1, post_node0_pos == 5)))
-   #  s.add(Implies(And(Dist[0] == 0, Dist[1] == 0), (post_node0_pos == pos)))
-    key_val = BitVec('key_val', 1)
+def node0(Dist, F, I, pos, idx, s):    
+   key_expr_field0 = Extract(7 - 4, 4 - 4, I)
+   for p  in range(4, -1, -1):
+      key_expr_field0 = If(And(Dist[0] == 1, pos == p), Extract(7 - p, 4 - p, I), key_expr_field0)
 
-    default_idx_node0 = Int('default_idx_node0')
-    # TODO: update idx, current we hardcode the key selection logic
-    key_sel = If(And(idx == 0, Dist[0] == 1), Extract(0,0,key_expr_field0), 
-                 If(And(idx == 0, Dist[1] == 1), Extract(0,0,key_expr_field1), 0))
-    ret_idx = If(key_sel == key_val, 1, default_idx_node0)
+   key_expr_field1 = Extract(7 - 5, 5 - 5, I)
+   for p in range(4, -1, -1):
+      key_expr_field1 = If(And(Dist[1] == 1, pos == p), Extract(7 - p, 5 - p, I), key_expr_field1)
 
-    return [new_node0_f0, new_node0_f1], post_node0_pos, ret_idx
+   new_node0_f0 = If(And(idx == 0, Dist[0] == 1), key_expr_field0, F[0])
+   new_node0_f1 = If(And(idx == 0, Dist[1] == 1), key_expr_field1, F[1])
+   post_node0_pos = If(idx == 0, If(Dist[0] == 1, 4, If(Dist[1] == 1, 5, pos)), pos)
+#  s.add(Implies(Dist[0] == 1, And(F[0] == key_expr_field0, post_node0_pos == 4)))
+#  s.add(Implies(Dist[1] == 1, And(F[1] == key_expr_field1, post_node0_pos == 5)))
+#  s.add(Implies(And(Dist[0] == 0, Dist[1] == 0), (post_node0_pos == pos)))
+   key_val = BitVec('key_val', 1)
+
+   default_idx_node0 = Int('default_idx_node0')
+   # TODO: update idx, current we hardcode the key selection logic
+   key_sel = If(And(idx == 0, Dist[0] == 1), Extract(0,0,key_expr_field0), 
+               If(And(idx == 0, Dist[1] == 1), Extract(0,0,key_expr_field1), 0))
+   ret_idx = If(key_sel == key_val, 1, default_idx_node0)
+
+   return [new_node0_f0, new_node0_f1], post_node0_pos, ret_idx
 
 def node1(Dist, F, I, pos, idx, s):
     pre_F0 = F[0]
