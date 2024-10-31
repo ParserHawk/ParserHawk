@@ -46,11 +46,10 @@ num_parser_nodes = 4
 # Input: Input_bitstream with the type bitVec var in z3, and initial value of all fields
 # Output: Updated value of all packet fields
 def specification(Input_bitstream, initial_field_val_list):
-    # out_field1 = BitVec(f'out_field0_{I_val}', 4)
     O_field0 = Extract(13, 13 - 8 + 1, Input_bitstream) #node 0
-    O_field1 = If(And(Extract(3, 2, O_field0) == BitVecVal(0b11, 2), Extract(1, 0, O_field0) == BitVecVal(0b11, 2)), Extract(5, 2, Input_bitstream), initial_field_val_list[1])
+    O_field1 = If(Extract(3, 0, O_field0) == BitVecVal(0b1111, 4), Extract(5, 2, Input_bitstream), initial_field_val_list[1])
     O_field2 = If(Extract(3, 0, O_field0) == BitVecVal(0b0011, 4), Extract(5, 0, Input_bitstream), initial_field_val_list[2])
-    
+
     return [O_field0, O_field1, O_field2]
 
 # TODO: should generate the spec automatically
