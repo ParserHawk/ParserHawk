@@ -13,7 +13,7 @@ def make_named_dict(data):
 '''
 DFS: Extracts field from a state and transitions to the next state
 '''
-def dfs(curr, offset, headers, header_types, states, input, result, z3_result):
+def dfs(curr, offset, headers, header_types, states, input, z3_result, len):
     # Extract header from the curr state -- may contain multiple fields
     st = states[curr]
     assert len(st["parser_ops"]) == 1, "Exactly one op supported yet!"
@@ -27,32 +27,21 @@ def dfs(curr, offset, headers, header_types, states, input, result, z3_result):
     hdr_type_info = header_types[headers[hdr_name]["header_type"]]
     fields = hdr_type_info["fields"]
 
-    res = {}
     for f in fields:
         k = f"{hdr_name}.{f[0]}"
-        v = input[offset:offset+f[1]]
-        res[k] = v
+        z3_v = Extract(len - (offset+f[1]-1), len - offset, input)
         offset += f[1]
 
-        tmp = {}
-        tmp[k] = v
-        result += [tmp]
+        tmp2 = {}
+        tmp2[k] = z3_v
+        z3_result += [tmp2]
+    
+    # get transition key
+    assert len(st["transition_key"]) < 2, "Upto 1 transition key supported"
+    transition_key_val = ""
 
-    # Handle transitions from curr state and recurse
-
-    # get transition key(s)
-    keys = []
-    for k in st["transition_key"]:
-        transition_key_val = k["value"]
-        keys += [f"{transition_key_val[0]}.{transition_key_val[1]}"]
-
-    # get val(s) of transition key(s) -- assuming that the input bitstream is binary
-    vals = []
-    for k in keys:
-        if k not in res or res[k] == '':
-            print("Input bitstream malformed. ", f"{k} not found")
-            exit(1)
-        vals += [res[k]]
+    if (len(st["transition_key"])):
+        transition_key_val = f'{st["transition_key"][0]["value"][0]}.{st["transition_key"][0]["value"][1]}'
 
     for t in st["transitions"]:
         assert t["mask"] == None, "Not accounting for mask right now"
@@ -61,18 +50,15 @@ def dfs(curr, offset, headers, header_types, states, input, result, z3_result):
         if t["type"] == "default":
             next_st = t["next_state"]
             if next_st == None: continue
-            dfs(next_st, offset, headers, header_types, states, input, result, z3_result)
+            dfs(next_st, offset, headers, header_types, states, input, z3_result, len)
             continue
-
-        assert (len(keys) > 0), "A non default state found, but no transition key was found"
 
         int_value = int(t["value"], 16)
         if int_value == int(''.join(vals), 2):
             next_st = t["next_state"]
-            dfs(next_st, offset, headers, header_types, states, input, result, z3_result)
-            break  # Only one match can happen, right?
+            dfs(next_st, offset, headers, header_types, states, input, z3_result, len)
 
-def generate(p4, input):
+def generate_z3_spec(p4, input, len):
     all_parsers     = p4["parsers"]
     headers         = make_named_dict(p4["headers"])
     header_types    = make_named_dict(p4["header_types"])
@@ -87,13 +73,13 @@ def generate(p4, input):
     result = []
     z3_result = []
 
-    dfs(curr, offset, headers, header_types, states, input, result, z3_result)
+    dfs(curr, offset, headers, header_types, states, input, result, z3_result, len)
 
     return result
 
 
-def read_json_and_generate(input, filename):
+def read_json_and_generate_z3_spec(input, filename, len):
     with open(filename) as file:
         p4 = json.load(file)
 
-    return generate(p4, input)
+    return generate_z3_spec(p4, input, len)
