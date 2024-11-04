@@ -16,6 +16,9 @@ Node1:
 extract(field1); // bit<3> field1;
 """
 
+# ASK XG: Why would pos be anything other than 0 here?
+# ASK XG: in other words, in which scenario pos will be 2?
+# ASK XG: shouldn't pos always be 0 here?
 def node0(Dist, F, I, pos, idx, s):    
    key_expr_field0 = Extract(7 - 4, 4 - 4, I)
    for p  in range(4, -1, -1):
