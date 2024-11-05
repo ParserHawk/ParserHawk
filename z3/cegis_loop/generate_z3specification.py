@@ -23,6 +23,8 @@ def dfs(curr, offset, headers, header_types, states, input, z3_result, len_, con
     assert len(op["parameters"]) == 1, "Exactly one param supported yet!"
     param = op["parameters"][0]
 
+    assert param["type"] == "regular", "Regular fields supported yet"
+
     hdr_name = param["value"]
     hdr_type_info = header_types[headers[hdr_name]["header_type"]]
     fields = hdr_type_info["fields"]
@@ -34,17 +36,27 @@ def dfs(curr, offset, headers, header_types, states, input, z3_result, len_, con
     
     hi = (len_ - offset) - 1
     lo = (len_ - (offset + f[1] - 1)) - 1
-    z3_v = If(cond, Extract(hi, lo, input), initial_field_val_list[global_index])  # constructing z3 expression
-    
+    z3_field = If(cond, Extract(hi, lo, input), initial_field_val_list[global_index])  # constructing z3 expression
+
     offset += f[1]
-    z3_result += [{k: z3_v}]
+    z3_result += [{k: z3_field}]
 
     # get transition key
     assert len(st["transition_key"]) < 2, "Upto 1 transition key supported"
+
     transition_key_val = ""
+    transition_key_val_size = 0
 
     if (len(st["transition_key"])):
-        transition_key_val = f'{st["transition_key"][0]["value"][0]}.{st["transition_key"][0]["value"][1]}'  # for example, "value" : ["ethernet", "etherType"]
+        h_ = st["transition_key"][0]["value"][0]
+        f_ = st["transition_key"][0]["value"][1]
+        transition_key_val = f'{h_}.{f_}'  # for example, "value" : ["ethernet", "etherType"]
+
+        # Get the size
+        for elem in header_types[headers[h_]["header_type"]]["fields"]:
+            if elem[0] == f_:
+                transition_key_val_size = elem[1]
+                break
 
     for t in st["transitions"]:
         assert t["mask"] == None, "Not accounting for mask right now"
@@ -62,9 +74,11 @@ def dfs(curr, offset, headers, header_types, states, input, z3_result, len_, con
         int_value = int(t['value'], 16)
         bv = BitVecVal(int_value, 4*(len(t['value'])-2))  # json shows values as hex, we convert it into binary and calculate len of binary value accordingly: substract 2 for `0x` and then 4x
 
-        hi = 15
+        # TODO: Make it generic now. Matching key can be a subset of the header bits, not necessarily the enture header/field 
+        hi = transition_key_val_size-1
         lo = 0
-        matching_key = Extract(hi, lo, z3_v)
+
+        matching_key = Extract(hi, lo, z3_field)
         new_cond = matching_key == bv
         next_st = t["next_state"]
         dfs(next_st, offset, headers, header_types, states, input, z3_result, len_, new_cond, initial_field_val_list, global_index)
