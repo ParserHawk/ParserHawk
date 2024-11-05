@@ -892,6 +892,10 @@ header ipv4_t {
     bit<8> version;
 }
 
+header tcp_t {
+    bit<8> version;
+}
+
 struct metadata {
     /* empty */
 }
@@ -899,6 +903,7 @@ struct metadata {
 struct headers {
     ethernet_t ethernet;
     ipv4_t ipv4;
+    tcp_t tcp;
 }
 
 parser MyParser(packet_in packet,
@@ -915,6 +920,14 @@ parser MyParser(packet_in packet,
     }
     state v4 {
         packet.extract(hdr.ipv4);
+        transition select(hdr.ipv4.version) {
+            0 : app;
+            default : accept;
+        }
+    }
+
+    state app {
+        packet.extract(hdr.tcp);
         transition accept;
     }
 

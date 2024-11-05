@@ -30,10 +30,10 @@ def dfs(curr, offset, headers, header_types, states, input, z3_result, len_, con
     fields = hdr_type_info["fields"]
 
     assert len(fields) == 1, "1 field per header support yet"
-    
+
     f = fields[0]
     k = f"{hdr_name}.{f[0]}"
-    
+
     hi = (len_ - offset) - 1
     lo = (len_ - (offset + f[1] - 1)) - 1
     z3_field = If(cond, Extract(hi, lo, input), initial_field_val_list[global_index])  # constructing z3 expression
@@ -103,6 +103,12 @@ def generate_z3_spec(p4, input, len_, initial_field_val_list):
     return z3_result
 
 
+'''
+input: a bitvec e.g., `input = BitVec('x', input_bit_stream_size)`
+fielname: JSON file created out of a P4 program using `p4c <p4-program> -o <output_dir>
+len_: len of input bitstream
+initial_field_val_list: just random list of size len_ for now
+'''
 def read_json_and_generate_z3_spec(input, filename, len_, initial_field_val_list):
     with open(filename) as file:
         p4 = json.load(file)

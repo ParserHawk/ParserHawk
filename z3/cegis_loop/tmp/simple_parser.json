@@ -41,6 +41,13 @@
       "fields" : [
         ["version", 8, false]
       ]
+    },
+    {
+      "name" : "tcp_t",
+      "id" : 4,
+      "fields" : [
+        ["version", 8, false]
+      ]
     }
   ],
   "headers" : [
@@ -69,6 +76,13 @@
       "name" : "ipv4",
       "id" : 3,
       "header_type" : "ipv4_t",
+      "metadata" : false,
+      "pi_omit" : true
+    },
+    {
+      "name" : "tcp",
+      "id" : 4,
+      "header_type" : "tcp_t",
       "metadata" : false,
       "pi_omit" : true
     }
@@ -145,6 +159,41 @@
           ],
           "transitions" : [
             {
+              "type" : "hexstr",
+              "value" : "0x00",
+              "mask" : null,
+              "next_state" : "app"
+            },
+            {
+              "type" : "default",
+              "value" : null,
+              "mask" : null,
+              "next_state" : null
+            }
+          ],
+          "transition_key" : [
+            {
+              "type" : "field",
+              "value" : ["ipv4", "version"]
+            }
+          ]
+        },
+        {
+          "name" : "app",
+          "id" : 2,
+          "parser_ops" : [
+            {
+              "parameters" : [
+                {
+                  "type" : "regular",
+                  "value" : "tcp"
+                }
+              ],
+              "op" : "extract"
+            }
+          ],
+          "transitions" : [
+            {
               "type" : "default",
               "value" : null,
               "mask" : null,
@@ -163,7 +212,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "simple_p4_examples/simple_parser.p4",
-        "line" : 62,
+        "line" : 75,
         "column" : 8,
         "source_fragment" : "MyDeparser"
       },
@@ -183,7 +232,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "simple_p4_examples/simple_parser.p4",
-        "line" : 44,
+        "line" : 57,
         "column" : 8,
         "source_fragment" : "MyIngress"
       },
@@ -197,7 +246,7 @@
       "id" : 1,
       "source_info" : {
         "filename" : "simple_p4_examples/simple_parser.p4",
-        "line" : 52,
+        "line" : 65,
         "column" : 8,
         "source_fragment" : "MyEgress"
       },
