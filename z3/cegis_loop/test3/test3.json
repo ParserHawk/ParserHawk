@@ -3,7 +3,9 @@
     {
       "name" : "scalars_0",
       "id" : 0,
-      "fields" : []
+      "fields" : [
+        ["tmp", 8, false]
+      ]
     },
     {
       "name" : "standard_metadata",
@@ -41,6 +43,27 @@
       "fields" : [
         ["version", 8, false]
       ]
+    },
+    {
+      "name" : "ipv6_t",
+      "id" : 4,
+      "fields" : [
+        ["version", 16, false]
+      ]
+    },
+    {
+      "name" : "a_t",
+      "id" : 5,
+      "fields" : [
+        ["val", 8, false]
+      ]
+    },
+    {
+      "name" : "b_t",
+      "id" : 6,
+      "fields" : [
+        ["wal", 8, false]
+      ]
     }
   ],
   "headers" : [
@@ -69,6 +92,27 @@
       "name" : "ipv4",
       "id" : 3,
       "header_type" : "ipv4_t",
+      "metadata" : false,
+      "pi_omit" : true
+    },
+    {
+      "name" : "ipv6",
+      "id" : 4,
+      "header_type" : "ipv6_t",
+      "metadata" : false,
+      "pi_omit" : true
+    },
+    {
+      "name" : "a",
+      "id" : 5,
+      "header_type" : "a_t",
+      "metadata" : false,
+      "pi_omit" : true
+    },
+    {
+      "name" : "b",
+      "id" : 6,
+      "header_type" : "b_t",
       "metadata" : false,
       "pi_omit" : true
     }
@@ -106,14 +150,46 @@
                 }
               ],
               "op" : "extract"
+            },
+            {
+              "parameters" : [
+                {
+                  "type" : "field",
+                  "value" : ["scalars", "tmp"]
+                },
+                {
+                  "type" : "expression",
+                  "value" : {
+                    "type" : "expression",
+                    "value" : {
+                      "op" : "&",
+                      "left" : {
+                        "type" : "field",
+                        "value" : ["ethernet", "etherType"]
+                      },
+                      "right" : {
+                        "type" : "hexstr",
+                        "value" : "0xff"
+                      }
+                    }
+                  }
+                }
+              ],
+              "op" : "set"
             }
           ],
           "transitions" : [
             {
               "type" : "hexstr",
-              "value" : "0x0000",
+              "value" : "0x00",
               "mask" : null,
               "next_state" : "v4"
+            },
+            {
+              "type" : "hexstr",
+              "value" : "0x01",
+              "mask" : null,
+              "next_state" : "v6"
             },
             {
               "type" : "default",
@@ -125,7 +201,7 @@
           "transition_key" : [
             {
               "type" : "field",
-              "value" : ["ethernet", "etherType"]
+              "value" : ["scalars", "tmp"]
             }
           ]
         },
@@ -145,13 +221,129 @@
           ],
           "transitions" : [
             {
+              "type" : "hexstr",
+              "value" : "0x00",
+              "mask" : null,
+              "next_state" : "va"
+            },
+            {
               "type" : "default",
               "value" : null,
               "mask" : null,
               "next_state" : null
             }
           ],
-          "transition_key" : []
+          "transition_key" : [
+            {
+              "type" : "field",
+              "value" : ["ipv4", "version"]
+            }
+          ]
+        },
+        {
+          "name" : "v6",
+          "id" : 2,
+          "parser_ops" : [
+            {
+              "parameters" : [
+                {
+                  "type" : "regular",
+                  "value" : "ipv6"
+                }
+              ],
+              "op" : "extract"
+            }
+          ],
+          "transitions" : [
+            {
+              "type" : "hexstr",
+              "value" : "0x0000",
+              "mask" : null,
+              "next_state" : "vb"
+            },
+            {
+              "type" : "default",
+              "value" : null,
+              "mask" : null,
+              "next_state" : null
+            }
+          ],
+          "transition_key" : [
+            {
+              "type" : "field",
+              "value" : ["ipv6", "version"]
+            }
+          ]
+        },
+        {
+          "name" : "va",
+          "id" : 3,
+          "parser_ops" : [
+            {
+              "parameters" : [
+                {
+                  "type" : "regular",
+                  "value" : "a"
+                }
+              ],
+              "op" : "extract"
+            }
+          ],
+          "transitions" : [
+            {
+              "type" : "hexstr",
+              "value" : "0x00",
+              "mask" : null,
+              "next_state" : "va"
+            },
+            {
+              "type" : "default",
+              "value" : null,
+              "mask" : null,
+              "next_state" : null
+            }
+          ],
+          "transition_key" : [
+            {
+              "type" : "field",
+              "value" : ["a", "val"]
+            }
+          ]
+        },
+        {
+          "name" : "vb",
+          "id" : 4,
+          "parser_ops" : [
+            {
+              "parameters" : [
+                {
+                  "type" : "regular",
+                  "value" : "b"
+                }
+              ],
+              "op" : "extract"
+            }
+          ],
+          "transitions" : [
+            {
+              "type" : "hexstr",
+              "value" : "0x00",
+              "mask" : null,
+              "next_state" : "vb"
+            },
+            {
+              "type" : "default",
+              "value" : null,
+              "mask" : null,
+              "next_state" : null
+            }
+          ],
+          "transition_key" : [
+            {
+              "type" : "field",
+              "value" : ["b", "wal"]
+            }
+          ]
         }
       ]
     }
@@ -162,8 +354,8 @@
       "name" : "deparser",
       "id" : 0,
       "source_info" : {
-        "filename" : "simple_p4_examples/simple_parser.p4",
-        "line" : 62,
+        "filename" : "simple_p4_examples/test3.p4",
+        "line" : 111,
         "column" : 8,
         "source_fragment" : "MyDeparser"
       },
@@ -182,8 +374,8 @@
       "name" : "ingress",
       "id" : 0,
       "source_info" : {
-        "filename" : "simple_p4_examples/simple_parser.p4",
-        "line" : 44,
+        "filename" : "simple_p4_examples/test3.p4",
+        "line" : 93,
         "column" : 8,
         "source_fragment" : "MyIngress"
       },
@@ -196,8 +388,8 @@
       "name" : "egress",
       "id" : 1,
       "source_info" : {
-        "filename" : "simple_p4_examples/simple_parser.p4",
-        "line" : 52,
+        "filename" : "simple_p4_examples/test3.p4",
+        "line" : 101,
         "column" : 8,
         "source_fragment" : "MyEgress"
       },
@@ -248,7 +440,7 @@
       ["standard_metadata", "priority"]
     ]
   ],
-  "program" : "tmp/simple_parser.p4i",
+  "program" : "test3/test3.p4i",
   "__meta__" : {
     "version" : [2, 23],
     "compiler" : "https://github.com/p4lang/p4c"

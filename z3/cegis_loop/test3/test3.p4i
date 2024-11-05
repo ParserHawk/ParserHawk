@@ -1,7 +1,7 @@
-# 0 "simple_p4_examples/simple_parser.p4"
+# 0 "simple_p4_examples/test3.p4"
 # 0 "<built-in>"
 # 0 "<command-line>"
-# 1 "simple_p4_examples/simple_parser.p4"
+# 1 "simple_p4_examples/test3.p4"
 # 1 "/usr/local/share/p4c/p4include/core.p4" 1
 /*
 Copyright 2013-present Barefoot Networks, Inc.
@@ -96,7 +96,7 @@ extern bool static_assert(bool check, string message);
 
 /// Like the above but using a default message.
 extern bool static_assert(bool check);
-# 2 "simple_p4_examples/simple_parser.p4" 2
+# 2 "simple_p4_examples/test3.p4" 2
 # 1 "/usr/local/share/p4c/p4include/v1model.p4" 1
 /*
 Copyright 2013-present Barefoot Networks, Inc.
@@ -882,7 +882,13 @@ package V1Switch<H, M>(Parser<H, M> p,
                        ComputeChecksum<H, M> ck,
                        Deparser<H> dep
                        );
-# 3 "simple_p4_examples/simple_parser.p4" 2
+# 3 "simple_p4_examples/test3.p4" 2
+
+/**
+2. If eth is 0, go to ipv4, if eth is 1 go to ipv6, otherwise just accept
+3a. If ipv4 is 0, go to a               3b. If ipv6 is 0, go to b
+4a. If a is 0, go to a                  4b, If b is 0, go to b
+*/
 
 header ethernet_t {
     bit<16> etherType;
@@ -892,6 +898,18 @@ header ipv4_t {
     bit<8> version;
 }
 
+header ipv6_t {
+    bit<16> version;
+}
+
+header a_t {
+    bit<8> val;
+}
+
+header b_t {
+    bit<8> wal;
+}
+
 struct metadata {
     /* empty */
 }
@@ -899,6 +917,9 @@ struct metadata {
 struct headers {
     ethernet_t ethernet;
     ipv4_t ipv4;
+    ipv6_t ipv6;
+    a_t a;
+    b_t b;
 }
 
 parser MyParser(packet_in packet,
@@ -908,16 +929,44 @@ parser MyParser(packet_in packet,
 
     state start {
         packet.extract(hdr.ethernet);
-        transition select(hdr.ethernet.etherType) {
+        transition select(hdr.ethernet.etherType[7:0]) {
             0 : v4;
+            1 : v6;
             default : accept;
         }
     }
+
     state v4 {
         packet.extract(hdr.ipv4);
-        transition accept;
+        transition select(hdr.ipv4.version) {
+            0: va;
+            default : accept;
+        }
     }
 
+    state v6 {
+        packet.extract(hdr.ipv6);
+        transition select(hdr.ipv6.version) {
+            0: vb;
+            default : accept;
+        }
+    }
+
+    state va {
+        packet.extract(hdr.a);
+        transition select(hdr.a.val) {
+            0: va;
+            default: accept;
+        }
+    }
+
+    state vb {
+        packet.extract(hdr.b);
+        transition select(hdr.b.wal) {
+            0: vb;
+            default: accept;
+        }
+    }
 }
 
 control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
