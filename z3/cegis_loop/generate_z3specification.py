@@ -15,10 +15,11 @@ DFS: Extracts field from a state and transitions to the next state
 '''
 def dfs(curr, offset, headers, header_types, states, input, z3_result, len_, cond, initial_field_val_list, global_index):
     st = states[curr]
-    assert len(st["parser_ops"]) == 1, "Exactly one op supported yet!"
 
-    op = st["parser_ops"][0]
-    assert op["op"] == "extract", "Only `extract` op support yet!"
+    for o in st["parser_ops"]:
+        if o["op"] == "extract":
+            op = o
+            break
 
     assert len(op["parameters"]) == 1, "Exactly one param supported yet!"
     param = op["parameters"][0]
@@ -74,7 +75,7 @@ def dfs(curr, offset, headers, header_types, states, input, z3_result, len_, con
         int_value = int(t['value'], 16)
         bv = BitVecVal(int_value, 4*(len(t['value'])-2))  # json shows values as hex, we convert it into binary and calculate len of binary value accordingly: substract 2 for `0x` and then 4x
 
-        # TODO: Make it generic now. Matching key can be a subset of the header bits, not necessarily the enture header/field 
+        # TODO: Make it generic now. Matching key can be a subset of the header bits, not necessarily the enture header/field
         hi = transition_key_val_size-1
         lo = 0
 

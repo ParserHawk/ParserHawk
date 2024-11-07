@@ -1,6 +1,6 @@
 
 # Parses the transition key's value as json does some magic like bit shifting and bitwise AND to extract bits from fields
-def parse_expression(expr):
+def parse_expression(expr, headers):
     if expr["type"] == "field":
         return (15, 0)
 
