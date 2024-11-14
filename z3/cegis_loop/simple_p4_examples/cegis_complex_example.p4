@@ -1,17 +1,16 @@
 #include <core.p4>
 #include <v1model.p4>
-// #include <tna.p4>
 
 header ethernet_t {
-    bit<16>   etherType;
+    bit<8>   etherType;
 }
 
 header ipv4_t {
-    bit<8>    version;
+    bit<4>    version;
 }
 
 header tcp_t {
-    bit<8>    version;
+    bit<4>    version;
 }
 
 struct metadata {

@@ -1,0 +1,60 @@
+{
+  "schema_version": "3.0.1",
+  "target": "tofino",
+  "build_date": "Thu Nov 14 18:38:18 2024",
+  "compiler_version": "9.13.4 (02c6724c5)",
+  "compilation_succeeded": true,
+  "compilation_time": "0.9608941078186035",
+  "run_id": "7783c64f2ca44761",
+  "target_data": {
+    "architecture": "tna",
+    "architectureConfig": {
+      "name": "64q",
+      "pipes": [
+        {
+          "pipe": 0,
+          "ingress": {
+            "pipeName": "MyIngress",
+            "nextControl": [
+              {
+                "pipe": 0,
+                "pipeName": "MyEgress"
+              }
+            ]
+          },
+          "egress": {
+            "pipeName": "MyEgress",
+            "nextControl": []
+          }
+        }
+      ]
+    },
+    "conf_file": "simple_tna_parser.conf"
+  },
+  "programs": [
+    {
+      "program_name": "simple_tna_parser.p4",
+      "p4_version": "p4-16",
+      "source_files": {
+        "src_root": "/home/haseeb/parser_syn/z3/cegis_loop/simple_p4_examples",
+        "includes": [],
+        "defines": []
+      },
+      "pipes": [
+        {
+          "pipe_id": 0,
+          "pipe_name": "pipe",
+          "files": {
+            "context": {
+              "path": "pipe/context.json"
+            },
+            "resources": [],
+            "graphs": [],
+            "logs": []
+          }
+        }
+      ]
+    }
+  ],
+  "compile_command": "/usr/local/bin/p4c simple_p4_examples/simple_tna_parser.p4"
+}
