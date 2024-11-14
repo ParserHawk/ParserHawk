@@ -2,6 +2,7 @@ from generate_spec import read_json_and_generate
 from colorama import Fore, Style
 
 zero_width16 = "0000000000000000"
+sixteen_ones = "1111111111111111"
 one_width16 = "0000000000000001"
 two_width16 = "0000000000000010"
 
@@ -117,8 +118,19 @@ def test1():
 
     print(Fore.GREEN + f"{count}/{count} Passed." + Style.RESET_ALL)
 
+def test_xg():
+    filename = "xg_example1/xg.json"
+    input = sixteen_ones + sixteen_ones + "1"
+    for i in range(0, 31):
+        input += "0"
+    
+    for i in range(0, 112):
+        input += "0"
+
+    res = run(input, filename)
+
 def main():
-    test()
+    test_xg()
     # test1()
 
 if __name__ == "__main__":

@@ -27,15 +27,21 @@ def dfs(curr, offset, headers, header_types, states, input, result):
     fields = hdr_type_info["fields"]
 
     res = {}
+    header_val = ""
     for f in fields:
         k = f"{hdr_name}.{f[0]}"
         v = input[offset:offset+f[1]]
         res[k] = v
         offset += f[1]
 
-        tmp = {}
-        tmp[k] = v
-        result += [tmp]
+        # tmp = {}
+        # tmp[k] = v
+        header_val += v
+        # result += [tmp]
+
+    result += [{
+        hdr_name: header_val
+    }]
 
     # Handle transitions from curr state and recurse
 
