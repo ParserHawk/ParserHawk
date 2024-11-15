@@ -34,10 +34,7 @@ def dfs(curr, offset, headers, header_types, states, input, result):
         res[k] = v
         offset += f[1]
 
-        # tmp = {}
-        # tmp[k] = v
         header_val += v
-        # result += [tmp]
 
     result += [{
         hdr_name: header_val

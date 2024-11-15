@@ -1,22 +1,26 @@
 #include <core.p4>
 #include <v1model.p4>
 
+// 112
 header ethernet_t {
     bit<48> dstAddr;
     bit<48> srcAddr;
     bit<16> etherType;
 }
 
+//32
 header int_switch_id_header_t {
     bit<1>  bos;
     bit<31> switch_id;
 }
 
+//32
 header icmp_t {
     bit<16> typeCode;
     bit<16> hdrChecksum;
 }
 
+// 160
 header ipv4_t {
     bit<4>  version;
     bit<4>  ihl;
@@ -32,6 +36,7 @@ header ipv4_t {
     bit<32> dstAddr;
 }
 
+// 320
 header ipv6_t {
     bit<4>   version;
     bit<8>   trafficClass;
@@ -43,6 +48,7 @@ header ipv6_t {
     bit<128> dstAddr;
 }
 
+// 160
 header tcp_t {
     bit<16> srcPort;
     bit<16> dstPort;
@@ -56,6 +62,7 @@ header tcp_t {
     bit<16> urgentPtr;
 }
 
+// 64
 header udp_t {
     bit<16> srcPort;
     bit<16> dstPort;
@@ -63,6 +70,7 @@ header udp_t {
     bit<16> checksum;
 }
 
+// 32
 header int_value_t {
     bit<1>  bos;
     bit<31> val;

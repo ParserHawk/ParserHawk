@@ -123,7 +123,7 @@ def test_xg():
     input = sixteen_ones + sixteen_ones + "1"
     for i in range(0, 31):
         input += "0"
-    
+
     for i in range(0, 112):
         input += "0"
 

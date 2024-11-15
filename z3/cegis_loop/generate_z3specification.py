@@ -1,4 +1,5 @@
 import json
+from typing import List
 from z3 import BitVec, Extract, If, And, BitVecVal
 
 '''
@@ -10,6 +11,16 @@ def make_named_dict(data):
         res[d["name"]] = d
     return res
 
+def get_per_field_binary_value(binary_value: str, fields_used_in_transition_key: List[str], field_size_by_name):
+    res = []
+    for f in reversed(fields_used_in_transition_key):
+        size = field_size_by_name[f]
+        tmp = "0"
+        if (size < len(binary_value)):
+            tmp = binary_value[-size:]
+            binary_value = binary_value[:-size]
+        res = [(f, tmp)] + res
+    return res
 '''
 DFS: Extracts field from a state and transitions to the next state
 '''
@@ -30,34 +41,34 @@ def dfs(curr, offset, headers, header_types, states, input, z3_result, len_, con
     hdr_type_info = header_types[headers[hdr_name]["header_type"]]
     fields = hdr_type_info["fields"]
 
-    assert len(fields) == 1, "1 field per header support yet"
+    size_of_hdr = 0
+    field_size_by_name = {}
+    field_pos_by_name = {}
 
-    f = fields[0]
-    k = f"{hdr_name}.{f[0]}"
+    _start = 0
+    for field in fields:
+        size_of_hdr += field[1]
+        field_size_by_name[field[0]] = field[1]
+
+        field_pos_by_name[field[0]] = (_start, _start+field[1])
+        _start += field[1]
 
     hi = (len_ - offset) - 1
-    lo = (len_ - (offset + f[1] - 1)) - 1
-    z3_field = If(cond, Extract(hi, lo, input), initial_field_val_list[global_index])  # constructing z3 expression
+    lo = (len_ - (offset + size_of_hdr - 1)) - 1
+    assert hi >= lo, "Wrong hi, lo in z3_hdr extraction"
+    assert lo >= 0, "lo too low in z3_hdr extraction"
+    z3_hdr = If(cond, Extract(hi, lo, input), initial_field_val_list[global_index])  # constructing z3 expression
 
-    offset += f[1]
-    z3_result += [{k: z3_field}]
+    offset += size_of_hdr
+    z3_result += [{hdr_name: z3_hdr}]
 
-    # get transition key
-    assert len(st["transition_key"]) < 2, "Upto 1 transition key supported"
+    # Assuming that all the fields used in transition belong to the header that was extracted in the current state
+    fields_used_in_transition_key = []
+    for tk in st["transition_key"]:
+        assert tk["value"][0] == hdr_name, "A field of non-current header was used in transition, a no no!!"
+        assert tk["type"] == "field", "Only fields supported in transition key"
 
-    transition_key_val = ""
-    transition_key_val_size = 0
-
-    if (len(st["transition_key"])):
-        h_ = st["transition_key"][0]["value"][0]
-        f_ = st["transition_key"][0]["value"][1]
-        transition_key_val = f'{h_}.{f_}'  # for example, "value" : ["ethernet", "etherType"]
-
-        # Get the size
-        for elem in header_types[headers[h_]["header_type"]]["fields"]:
-            if elem[0] == f_:
-                transition_key_val_size = elem[1]
-                break
+        fields_used_in_transition_key += [tk["value"][1]]
 
     for t in st["transitions"]:
         assert t["mask"] == None, "Not accounting for mask right now"
@@ -72,15 +83,20 @@ def dfs(curr, offset, headers, header_types, states, input, z3_result, len_, con
             dfs(next_st, offset, headers, header_types, states, input, z3_result, len_, new_cond, initial_field_val_list, global_index)
             continue
 
-        int_value = int(t['value'], 16)
-        bv = BitVecVal(int_value, 4*(len(t['value'])-2))  # json shows values as hex, we convert it into binary and calculate len of binary value accordingly: substract 2 for `0x` and then 4x
+        int_value = int(t['value'], 0)  # base 0 means check first two chars of t['value'] and decide
+        binary_value = bin(int_value)[2:]  # binary value without `0b`
+        per_field_binary_value = get_per_field_binary_value(binary_value, fields_used_in_transition_key, field_size_by_name)  # returns a [pair(field name, value)] for each field used in transition key
 
-        # TODO: Make it generic now. Matching key can be a subset of the header bits, not necessarily the enture header/field
-        hi = transition_key_val_size-1
-        lo = 0
+        new_cond = True
+        for field_name, v in per_field_binary_value:
+            v = "0b" + v
+            bv = BitVecVal(int(v, 0), field_size_by_name[field_name])
 
-        matching_key = Extract(hi, lo, z3_field)
-        new_cond = matching_key == bv
+            x, y = field_pos_by_name[field_name]
+            assert y-1 >= x, "Wrong x y in new_cond creation"
+            assert x >= 0, "x <= 0 in new_cond creation"
+            new_cond = And(new_cond, Extract(y-1, x, z3_hdr) == bv)  # It is a concatenation of several Extract()==bv when using composite transition key
+
         next_st = t["next_state"]
         dfs(next_st, offset, headers, header_types, states, input, z3_result, len_, new_cond, initial_field_val_list, global_index)
 
