@@ -11,9 +11,9 @@ one_width8 = "00000001"
 
 def run(input, filename):
     result = read_json_and_generate(input, filename)
-    for hdr in result:
-        for field in hdr:
-            print(f"{field} => {hdr[field]}")
+    for record in result:
+        for hdr in record:
+            print(hdr, "=>", record[hdr])
     return result
 
 def verify(res, expected):

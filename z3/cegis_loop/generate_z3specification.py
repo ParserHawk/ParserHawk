@@ -1,4 +1,5 @@
 import json
+import sys
 from typing import List
 from z3 import BitVec, Extract, If, And, BitVecVal
 
@@ -137,7 +138,11 @@ input: a bitvec e.g., `input = BitVec('x', input_bit_stream_size)`
 fielname: JSON file created out of a P4 program using `p4c <p4-program> -o <output_dir>
 len_: len of input bitstream
 '''
-def read_json_and_generate_z3_spec(input, filename, len_):
+def read_json_and_generate_z3_spec(input, len_, filename=""):
+    if filename == "" or len(sys.argv) > 1:
+        assert len(sys.argv) > 1
+        filename = sys.argv[1]
+
     with open(filename) as file:
         p4 = json.load(file)
 

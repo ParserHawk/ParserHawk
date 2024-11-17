@@ -1,4 +1,5 @@
 import json
+import sys
 
 '''
 Makes it easy to access data by name
@@ -12,7 +13,7 @@ def make_named_dict(data):
 '''
 DFS: Extracts field from a state and transitions to the next state
 '''
-def dfs(curr, offset, headers, header_types, states, input, result):
+def dfs(curr, offset, headers, header_types, states, input, result, initial_vals):
     # Extract header from the curr state -- may contain multiple fields
     st = states[curr]
     assert len(st["parser_ops"]) == 1, "Exactly one op supported yet!"
@@ -36,9 +37,7 @@ def dfs(curr, offset, headers, header_types, states, input, result):
 
         header_val += v
 
-    result += [{
-        hdr_name: header_val
-    }]
+    result[hdr_name] = header_val
 
     # Handle transitions from curr state and recurse
 
@@ -63,7 +62,7 @@ def dfs(curr, offset, headers, header_types, states, input, result):
         if t["type"] == "default":
             next_st = t["next_state"]
             if next_st == None: continue
-            dfs(next_st, offset, headers, header_types, states, input, result)
+            dfs(next_st, offset, headers, header_types, states, input, result, initial_vals)
             continue
 
         assert (len(keys) > 0), "A non default state found, but no transition key was found"
@@ -71,7 +70,7 @@ def dfs(curr, offset, headers, header_types, states, input, result):
         int_value = int(t["value"], 16)
         if int_value == int(''.join(vals), 2):
             next_st = t["next_state"]
-            dfs(next_st, offset, headers, header_types, states, input, result)
+            dfs(next_st, offset, headers, header_types, states, input, result, initial_vals)
             break  # Only one match can happen, right?
 
 def generate(p4, input):
@@ -86,14 +85,27 @@ def generate(p4, input):
 
     curr = parser["init_state"]
     offset = 0
-    result = []
+    result = {}
 
-    dfs(curr, offset, headers, header_types, states, input, result)
+    initial_vals = {}
+    for h in headers: initial_vals[h] = 0
 
-    return result
+    dfs(curr, offset, headers, header_types, states, input, result, initial_vals)
+
+    for h in initial_vals: 
+        if h not in result: result[h] = initial_vals[h]
+    
+    res = []
+    for h in result: res += [{h: result[h]}]
+
+    return res
 
 
-def read_json_and_generate(input, filename):
+def read_json_and_generate(input, filename=""):
+    if filename == "" or len(sys.argv) > 1:
+        assert len(sys.argv) > 1
+        filename = sys.argv[1]
+
     with open(filename) as file:
         p4 = json.load(file)
 
