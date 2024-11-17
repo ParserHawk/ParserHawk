@@ -101,15 +101,8 @@ def generate(p4, input):
     return res
 
 
-def read_json_and_generate(input, filename=""):
-    if filename == "" or len(sys.argv) > 1:
-        assert len(sys.argv) > 1
-        filename = sys.argv[1]
-
+def read_json_and_generate(input, filename):
     with open(filename) as file:
         p4 = json.load(file)
 
     return generate(p4, input)
-
-
-# TODO: mention the commit I used for p4c and expose both functions (json and p4)

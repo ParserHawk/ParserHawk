@@ -1,3 +1,4 @@
+import sys
 from generate_spec import read_json_and_generate
 from colorama import Fore, Style
 
@@ -10,6 +11,7 @@ zero_width8 = "00000000"
 one_width8 = "00000001"
 
 def run(input, filename):
+    if len(sys.argv) > 1: filename = sys.argv[1]
     result = read_json_and_generate(input, filename)
     for record in result:
         for hdr in record:
