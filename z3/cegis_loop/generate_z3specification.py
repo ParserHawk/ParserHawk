@@ -24,7 +24,7 @@ def get_per_field_binary_value(binary_value: str, fields_used_in_transition_key:
 '''
 DFS: Extracts field from a state and transitions to the next state
 '''
-def dfs(curr, offset, headers, header_types, states, input, z3_result, len_, cond, initial_field_val_list, global_index):
+def dfs(curr, offset, headers, header_types, states, input, z3_result, len_, cond, header_default_vals):
     st = states[curr]
 
     for o in st["parser_ops"]:
@@ -57,7 +57,9 @@ def dfs(curr, offset, headers, header_types, states, input, z3_result, len_, con
     lo = (len_ - (offset + size_of_hdr - 1)) - 1
     assert hi >= lo, "Wrong hi, lo in z3_hdr extraction"
     assert lo >= 0, "lo too low in z3_hdr extraction"
-    z3_hdr = If(cond, Extract(hi, lo, input), initial_field_val_list[global_index])  # constructing z3 expression
+    
+    assert hdr_name in header_default_vals, f"Initial value not found for {hdr_name}"
+    z3_hdr = If(cond, Extract(hi, lo, input), header_default_vals[hdr_name][0])  # constructing z3 expression
 
     offset += size_of_hdr
     z3_result += [{hdr_name: z3_hdr}]
@@ -74,13 +76,11 @@ def dfs(curr, offset, headers, header_types, states, input, z3_result, len_, con
         assert t["mask"] == None, "Not accounting for mask right now"
         assert t["type"] in ["hexstr", "default"], f"Only hex type supported yet, found {t['type']}"
 
-        global_index += 1
-
         if t["type"] == "default":
             next_st = t["next_state"]
             if next_st == None: continue
             new_cond = True
-            dfs(next_st, offset, headers, header_types, states, input, z3_result, len_, new_cond, initial_field_val_list, global_index)
+            dfs(next_st, offset, headers, header_types, states, input, z3_result, len_, new_cond, header_default_vals)
             continue
 
         int_value = int(t['value'], 0)  # base 0 means check first two chars of t['value'] and decide
@@ -98,10 +98,10 @@ def dfs(curr, offset, headers, header_types, states, input, z3_result, len_, con
             new_cond = And(new_cond, Extract(y-1, x, z3_hdr) == bv)  # It is a concatenation of several Extract()==bv when using composite transition key
 
         next_st = t["next_state"]
-        dfs(next_st, offset, headers, header_types, states, input, z3_result, len_, new_cond, initial_field_val_list, global_index)
+        dfs(next_st, offset, headers, header_types, states, input, z3_result, len_, new_cond, header_default_vals)
 
 
-def generate_z3_spec(p4, input, len_, initial_field_val_list):
+def generate_z3_spec(p4, input, len_):
     all_parsers     = p4["parsers"]
     headers         = make_named_dict(p4["headers"])
     header_types    = make_named_dict(p4["header_types"])
@@ -115,19 +115,30 @@ def generate_z3_spec(p4, input, len_, initial_field_val_list):
     offset = 0
     z3_result = []
 
-    dfs(curr, offset, headers, header_types, states, input, z3_result, len_, True, initial_field_val_list, 0)
+    # Create header_default_vals
+    header_type_sizes = {}
+    for t in header_types:
+        s = 0
+        for f in header_types[t]["fields"]: s += f[1]
+        header_type_sizes[t] = s
 
-    return z3_result
+    header_default_vals = {}
+    for h in headers:
+        s = header_type_sizes[headers[h]["header_type"]]
+        if s: header_default_vals[headers[h]["name"]] = (BitVec(f'initial_val_{headers[h]["name"]}', s), s)
+
+    dfs(curr, offset, headers, header_types, states, input, z3_result, len_, True, header_default_vals)
+
+    return z3_result, header_default_vals
 
 
 '''
 input: a bitvec e.g., `input = BitVec('x', input_bit_stream_size)`
 fielname: JSON file created out of a P4 program using `p4c <p4-program> -o <output_dir>
 len_: len of input bitstream
-initial_field_val_list: just random list of size len_ for now
 '''
-def read_json_and_generate_z3_spec(input, filename, len_, initial_field_val_list):
+def read_json_and_generate_z3_spec(input, filename, len_):
     with open(filename) as file:
         p4 = json.load(file)
 
-    return generate_z3_spec(p4, input, len_, initial_field_val_list)
+    return generate_z3_spec(p4, input, len_)
