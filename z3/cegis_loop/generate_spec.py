@@ -13,7 +13,7 @@ def make_named_dict(data):
 '''
 DFS: Extracts field from a state and transitions to the next state
 '''
-def dfs(curr, offset, headers, header_types, states, input, result, initial_vals):
+def dfs(curr, offset, headers, header_types, states, input, result,):
     # Extract header from the curr state -- may contain multiple fields
     st = states[curr]
     assert len(st["parser_ops"]) == 1, "Exactly one op supported yet!"
@@ -62,7 +62,7 @@ def dfs(curr, offset, headers, header_types, states, input, result, initial_vals
         if t["type"] == "default":
             next_st = t["next_state"]
             if next_st == None: continue
-            dfs(next_st, offset, headers, header_types, states, input, result, initial_vals)
+            dfs(next_st, offset, headers, header_types, states, input, result)
             continue
 
         assert (len(keys) > 0), "A non default state found, but no transition key was found"
@@ -70,10 +70,10 @@ def dfs(curr, offset, headers, header_types, states, input, result, initial_vals
         int_value = int(t["value"], 16)
         if int_value == int(''.join(vals), 2):
             next_st = t["next_state"]
-            dfs(next_st, offset, headers, header_types, states, input, result, initial_vals)
+            dfs(next_st, offset, headers, header_types, states, input, result)
             break  # Only one match can happen, right?
 
-def generate(p4, input):
+def generate(p4, input, initial_vals):
     all_parsers     = p4["parsers"]
     headers         = make_named_dict(p4["headers"])
     header_types    = make_named_dict(p4["header_types"])
@@ -87,22 +87,22 @@ def generate(p4, input):
     offset = 0
     result = {}
 
-    initial_vals = {}
-    for h in headers: initial_vals[h] = 0
+    if (len(initial_vals) == 0):
+        for h in headers: initial_vals[h] = 0
 
-    dfs(curr, offset, headers, header_types, states, input, result, initial_vals)
+    dfs(curr, offset, headers, header_types, states, input, result)
 
     for h in initial_vals: 
         if h not in result: result[h] = initial_vals[h]
-    
+
     res = []
     for h in result: res += [{h: result[h]}]
 
     return res
 
 
-def read_json_and_generate(input, filename):
+def read_json_and_generate(input, filename, initial_vals={}):
     with open(filename) as file:
         p4 = json.load(file)
 
-    return generate(p4, input)
+    return generate(p4, input, initial_vals)
