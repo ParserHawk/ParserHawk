@@ -16,28 +16,27 @@ DFS: Extracts field from a state and transitions to the next state
 def dfs(curr, offset, headers, header_types, states, input, result,):
     # Extract header from the curr state -- may contain multiple fields
     st = states[curr]
-    assert len(st["parser_ops"]) == 1, "Exactly one op supported yet!"
-    op = st["parser_ops"][0]
-    assert op["op"] == "extract", "Only `extract` op support yet!"
-
-    assert len(op["parameters"]) == 1, "Exactly one param supported yet!"
-    param = op["parameters"][0]
-
-    hdr_name = param["value"]
-    hdr_type_info = header_types[headers[hdr_name]["header_type"]]
-    fields = hdr_type_info["fields"]
 
     res = {}
-    header_val = ""
-    for f in fields:
-        k = f"{hdr_name}.{f[0]}"
-        v = input[offset:offset+f[1]]
-        res[k] = v
-        offset += f[1]
+    for op in st["parser_ops"]:
+        assert op["op"] == "extract", "Only `extract` op support yet!"
 
-        header_val += v
+        assert len(op["parameters"]) == 1, "Exactly one param supported yet!"
+        param = op["parameters"][0]
 
-    result[hdr_name] = header_val
+        hdr_name = param["value"]
+        hdr_type_info = header_types[headers[hdr_name]["header_type"]]
+        fields = hdr_type_info["fields"]
+
+        header_val = ""
+        for f in fields:
+            k = f"{hdr_name}.{f[0]}"
+            v = input[offset:offset+f[1]]
+            res[k] = v
+            offset += f[1]
+
+            header_val += v
+        result[hdr_name] = header_val
 
     # Handle transitions from curr state and recurse
 
