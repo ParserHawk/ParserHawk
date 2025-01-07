@@ -8,7 +8,7 @@ import random
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 # Now you can import the library from Folder B
-from practical_ex.code_generation import *
+from practical_ex.code_gen_big_tcam import *
 
 """
 XXXX 0011 XXXXXX
@@ -48,6 +48,8 @@ size_of_key = 2
 num_transitions = 2
 num_parser_nodes = 4
 
+tcam_num = 10
+
 # TODO: should generate the specification automatically
 # Input: Input_bitstream with the type bitVec var in z3, and initial value of all fields
 # Output: Updated value of all packet fields
@@ -57,8 +59,8 @@ def specification(Input_bitstream, initial_field_val_list):
     #  pos 0   1  2  3 4
     #  idx 13 12 11 10 9 8 
     O_field0 = Extract(input_bit_stream_size - 1, input_bit_stream_size - 1 - pkt_field_size_list[0] + 1, Input_bitstream) #node 0
-    O_field1 = If(Extract(3, 0, O_field0) == BitVecVal(0b1111, 4), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], 0, Input_bitstream), initial_field_val_list[1])
-    O_field2 = If(Extract(3, 0, O_field0) == BitVecVal(0b0011, 4), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], 0, Input_bitstream), initial_field_val_list[2])
+    O_field1 = If(Extract(3, 0, O_field0) == BitVecVal(0b1111, 4), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
+    O_field2 = If(Extract(3, 0, O_field0) == BitVecVal(0b0011, 4), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[2] + 1, Input_bitstream), initial_field_val_list[2])
     
     return [O_field0, O_field1, O_field2]
 
@@ -90,6 +92,10 @@ def spec(Input_bitstream, initial_list):
 #                         If(And(Dist[0] == 1, pos == 6), Extract(7, 0, I),
 #                                 F[0])))))))
 def dynamic_extract_loop(pos, I, Dist, F, field_size, field_id):
+    # a trick to avoid the case where there is no sufficient length to extract
+    # TODO: try to find a way to solve this problem fundamentally
+    if input_bit_stream_size - field_size < 0:
+        return BitVecVal(0, field_size)
     expr = F
     for i in range(input_bit_stream_size - field_size + 1):
         start = input_bit_stream_size - 1 - i
@@ -148,11 +154,13 @@ def post_node_pos(idx, Dist, node_id, alloc_matrix, pos):
     # Add the outermost condition for idx
     return If(idx == node_id, result, pos)
 
-def generate_return_idx(key_val_list, key_mask_list, tran_idx_list, default_idx_node1, num_transitions, size_of_key, key_sel, idx, node_id):
+# def generate_return_idx(key_val_list, key_mask_list, tran_idx_list, default_idx_node1, num_transitions, size_of_key, key_sel, idx, node_id):
+def generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node1, num_transitions, size_of_key, key_sel, idx, node_id):
     ret_idx = default_idx_node1  # Default case
-    for i in reversed(range(num_transitions)):
+    # Reverse the order because we want to make the TCAM entry with smaller number to dominate the transition logic
+    for i in range(tcam_num - 1, -1, -1):
         # key_val_list = BitVec(name, size_of_key);
-        ret_idx = If((Extract(size_of_key - 1, 0, key_sel) & key_mask_list[i]) == key_val_list[i], tran_idx_list[i], ret_idx)
+        ret_idx = If(And(assignments[i] == node_id, (Extract(size_of_key - 1, 0, key_sel) & key_mask_total_list[i]) == key_val_total_list[i]), tran_idx_total_list[i], ret_idx)
 
     # Final state transition for idx == 1
     ret_idx = If(idx == node_id, ret_idx, idx)
@@ -166,8 +174,11 @@ def update_extract_states(idx, Dist, extract_status, node_id, num_pkt_fields):
     return ret_l
 
 # Behavior of parser node 0
-def node0(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_list, tran_idx_list, default_idx_node, extract_status, s):
+# def node0(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_list, tran_idx_list, default_idx_node, extract_status, s):
+def node0(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
     nodeID = 0
+    # for i in range(num_pkt_fields):
+    #     s.add(Implies(Dist[i] == 1, pos + pkt_field_size_list[i] < input_bit_stream_size))
     key_expr_list = generate_key_expr_list(pos, I, Dist, F, alloc_matrix)
     update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id = nodeID)
     post_pos = post_node_pos(idx = idx, Dist = Dist, node_id = nodeID, alloc_matrix=alloc_matrix, pos = pos)
@@ -183,14 +194,18 @@ def node0(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_
     # tran_idx_list = tran_idx_list
     # default_idx_node = default_idx_node
     # Build the state transition logic with a for loop
-    ret_idx = generate_return_idx(key_val_list, key_mask_list, tran_idx_list, 
+    # ret_idx = generate_return_idx(key_val_list, key_mask_list, tran_idx_list, 
+    #                               default_idx_node, num_transitions, size_of_key, key_sel,
+    #                               idx, node_id = nodeID)
+    ret_idx = generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, 
                                   default_idx_node, num_transitions, size_of_key, key_sel,
                                   idx, node_id = nodeID)
     
     return update_field_val_l, post_pos, ret_idx, extract_status
 
 # Behavior of parser node 1
-def node1(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_list, tran_idx_list, default_idx_node, extract_status, s):
+# def node1(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_list, tran_idx_list, default_idx_node, extract_status, s):
+def node1(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
     nodeID = 1
     key_expr_list = generate_key_expr_list(pos, I, Dist, F, alloc_matrix)
     update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id = nodeID)
@@ -206,14 +221,15 @@ def node1(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_
     # tran_idx_list = tran_idx_list
     # default_idx_node = default_idx_node
     # Build the state transition logic with a for loop
-    ret_idx = generate_return_idx(key_val_list, key_mask_list, tran_idx_list, 
+    ret_idx = generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list,  
                                   default_idx_node, num_transitions, size_of_key, key_sel,
                                   idx, node_id = nodeID)
     
     return update_field_val_l, post_pos, ret_idx, extract_status
 
 # Behavior of parser node 2
-def node2(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_list, tran_idx_list, default_idx_node, extract_status, s):
+# def node2(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_list, tran_idx_list, default_idx_node, extract_status, s):
+def node2(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
     nodeID = 2
     key_expr_list = generate_key_expr_list(pos, I, Dist, F, alloc_matrix)
     update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id = nodeID)
@@ -229,14 +245,15 @@ def node2(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_
     # tran_idx_list = tran_idx_list
     # default_idx_node = default_idx_node
     # Build the state transition logic with a for loop
-    ret_idx = generate_return_idx(key_val_list, key_mask_list, tran_idx_list, 
+    ret_idx = generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, 
                                   default_idx_node, num_transitions, size_of_key, key_sel,
                                   idx, node_id = nodeID)
     
     return update_field_val_l, post_pos, ret_idx, extract_status
 
 # Behavior of parser node 3
-def node3(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_list, tran_idx_list, default_idx_node, extract_status, s):
+# def node3(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_list, tran_idx_list, default_idx_node, extract_status, s):
+def node3(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
     nodeID = 3
     key_expr_list = generate_key_expr_list(pos, I, Dist, F, alloc_matrix)
     update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id = nodeID)
@@ -252,7 +269,7 @@ def node3(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_
     # tran_idx_list = tran_idx_list
     # default_idx_node = default_idx_node
     # Build the state transition logic with a for loop
-    ret_idx = generate_return_idx(key_val_list, key_mask_list, tran_idx_list, 
+    ret_idx = generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, 
                                   default_idx_node, num_transitions, size_of_key, key_sel,
                                   idx, node_id = nodeID)
     
@@ -282,7 +299,10 @@ def temporary_bitvec_for_counterexample(I_val, random_initial_value_list, num_pk
 # Implementation, concrete z3 variables' values are decided by the z3 solver
 def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list, 
                    alloc_matrix, Lookahead, 
-                   key_val_2D_list, key_mask_2D_list, tran_idx_2D_list, default_idx_node_list, testcaseID, 
+                   assignments,
+                #    key_val_2D_list, key_mask_2D_list, tran_idx_2D_list, 
+                   key_val_total_list, key_mask_total_list, tran_idx_total_list,
+                   default_idx_node_list, testcaseID, 
                    s):
     
     Input_bitstream, Input_Fields, extract_status, temp_constraint = temporary_bitvec_for_counterexample(I_val=Input_bitstream, 
@@ -302,9 +322,13 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
     Out_Fields, post_pos, idx, post_extract_status = nodes[0](Flags[0], Out_Fields, Input_bitstream, 
                                                                         idx=idx, pos=post_pos, alloc_matrix=alloc_matrix, 
                                                                         Lookahead=Lookahead, 
-                                                                        key_val_list=key_val_2D_list[0], 
-                                                                        key_mask_list=key_mask_2D_list[0], 
-                                                                        tran_idx_list=tran_idx_2D_list[0], 
+                                                                        # key_val_list=key_val_2D_list[0], 
+                                                                        # key_mask_list=key_mask_2D_list[0], 
+                                                                        # tran_idx_list=tran_idx_2D_list[0],
+                                                                        assignments=assignments,
+                                                                        key_val_total_list=key_val_total_list, 
+                                                                        key_mask_total_list=key_mask_total_list, 
+                                                                        tran_idx_total_list=tran_idx_total_list,
                                                                         default_idx_node=default_idx_node_list[0], 
                                                                         extract_status=post_extract_status, s=s)
     
@@ -314,7 +338,12 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
             condition = idx == i
             out_fields, post_pos_i, idx_i, post_extract_status_i = nodes[i](
                 Flags[i], Out_Fields, Input_bitstream, idx=idx, pos=post_pos, alloc_matrix=alloc_matrix,
-                Lookahead=Lookahead, key_val_list=key_val_2D_list[i], key_mask_list=key_mask_2D_list[i], tran_idx_list=tran_idx_2D_list[i],
+                Lookahead=Lookahead, 
+                # key_val_list=key_val_2D_list[i], key_mask_list=key_mask_2D_list[i], tran_idx_list=tran_idx_2D_list[i],
+                assignments=assignments,
+                key_val_total_list=key_val_total_list,
+                key_mask_total_list=key_mask_total_list, 
+                tran_idx_total_list=tran_idx_total_list,
                 default_idx_node=default_idx_node_list[i], extract_status=post_extract_status, s=s
             )
             results.append((condition, out_fields, post_pos_i, idx_i, post_extract_status_i))
@@ -593,11 +622,21 @@ def synthesis_step(cexamples):
     
     Lookahead = lookahead_gen(num_parser_nodes=num_parser_nodes, lookahead_window_size=lookahead_window_size)
     
-    key_val_2D_list, key_mask_2D_list = key_val_gen(num_transitions=num_transitions, size_of_key=size_of_key, 
-                                  num_parser_nodes=num_parser_nodes)
-    tran_idx_2D_list = tran_idx_gen(num_transitions=num_transitions,num_parser_nodes=num_parser_nodes)
+    # key_val_2D_list, key_mask_2D_list = key_val_gen(num_transitions=num_transitions, size_of_key=size_of_key, 
+    #                               num_parser_nodes=num_parser_nodes)
+    # tran_idx_2D_list = tran_idx_gen(num_transitions=num_transitions,num_parser_nodes=num_parser_nodes)
     
     default_idx_node_list = default_idx_gen(num_parser_nodes=num_parser_nodes)
+
+    # NEW CODE
+    assignments = [Int(f'assign_{i}') for i in range(tcam_num)]
+    key_val_total_list = [BitVec(f'key_val{i}', size_of_key) for i in range(tcam_num)]
+    key_mask_total_list = [BitVec(f'key_mask{i}', size_of_key) for i in range(tcam_num)]
+    tran_idx_total_list = [Int(f'tran_idx{i}') for i in range(tcam_num)]
+    constraints = [assignments[i] >= 0 for i in range(tcam_num)]
+    for i in range(tcam_num - 1):
+        constraints.append(assignments[i] <= assignments[i + 1])
+    s.add(constraints)
 
     if not cexamples:
         # We force the counterexample set to be non-empty
@@ -610,9 +649,13 @@ def synthesis_step(cexamples):
             spec_out = spec(format(Input_bitval, '0{size}b'.format(size=input_bit_stream_size)), random_initial_value_list)
             impl_out = implementation(Flags, Input_bitval, idx, pos, random_initial_value_list, 
                                       alloc_matrix, Lookahead, 
-                                      key_val_2D_list=key_val_2D_list, 
-                                      key_mask_2D_list=key_mask_2D_list, 
-                                      tran_idx_2D_list=tran_idx_2D_list, 
+                                    #   key_val_2D_list=key_val_2D_list, 
+                                    #   key_mask_2D_list=key_mask_2D_list, 
+                                    #   tran_idx_2D_list=tran_idx_2D_list, 
+                                      assignments=assignments,
+                                      key_val_total_list=key_val_total_list,
+                                      key_mask_total_list=key_mask_total_list,
+                                      tran_idx_total_list=tran_idx_total_list,
                                       default_idx_node_list=default_idx_node_list, 
                                       testcaseID=j,s=s)
             # the output of implementation should be equal to specification for all members in the counterexample set
@@ -660,30 +703,60 @@ def verification_step(model, cexamples):
             else:
                 s.add(Lookahead[i][j] == 0)
     
-    key_val_2D_list, key_mask_2D_list = key_val_gen(num_transitions=num_transitions, size_of_key=size_of_key, 
-                                  num_parser_nodes=num_parser_nodes)
-    for i in range(len(key_val_2D_list)):
-        for j in range(len(key_val_2D_list[i])):
-            value = model.evaluate(key_val_2D_list[i][j], model_completion=True)
-            if value is not None:
-                s.add(key_val_2D_list[i][j] == value.as_long())
-            else:
-                s.add(key_val_2D_list[i][j] == 0)
-    for i in range(len(key_mask_2D_list)):
-        for j in range(len(key_mask_2D_list[i])):
-            value = model.evaluate(key_mask_2D_list[i][j], model_completion=True)
-            if value is not None:
-                s.add(key_mask_2D_list[i][j] == value.as_long())
-            else:
-                s.add(key_mask_2D_list[i][j] == 0)
-    tran_idx_2D_list = tran_idx_gen(num_transitions=num_transitions,num_parser_nodes=num_parser_nodes)
-    for i in range(len(tran_idx_2D_list)):
-        for j in range(len(tran_idx_2D_list[i])):
-            value = model.evaluate(tran_idx_2D_list[i][j], model_completion=True)
-            if value is not None:
-                s.add(tran_idx_2D_list[i][j] == value.as_long())
-            else:
-                s.add(tran_idx_2D_list[i][j] == num_parser_nodes + 1)
+    assignments = [Int(f'assign_{i}') for i in range(tcam_num)]
+    key_val_total_list = [BitVec(f'key_val{i}', size_of_key) for i in range(tcam_num)]
+    key_mask_total_list = [BitVec(f'key_mask{i}', size_of_key) for i in range(tcam_num)]
+    tran_idx_total_list = [Int(f'tran_idx{i}') for i in range(tcam_num)]
+
+    for i in range(len(assignments)):
+        value = model.evaluate(assignments[i], model_completion=True)
+        if value is not None:
+            s.add(assignments[i] == value.as_long())
+        else:
+            s.add(assignments[i] == tcam_num)
+    for i in range(len(key_val_total_list)):
+        value = model.evaluate(key_val_total_list[i], model_completion=True)
+        if value is not None:
+            s.add(key_val_total_list[i] == value.as_long())
+        else:
+            s.add(key_val_total_list[i] == -1)
+    for i in range(len(key_mask_total_list)):
+        value = model.evaluate(key_mask_total_list[i], model_completion=True)
+        if value is not None:
+            s.add(key_mask_total_list[i] == value.as_long())
+        else:
+            s.add(key_mask_total_list[i] == -1)
+    for i in range(len(tran_idx_total_list)):
+        value = model.evaluate(tran_idx_total_list[i], model_completion=True)
+        if value is not None:
+            s.add(tran_idx_total_list[i] == value.as_long())
+        else:
+            s.add(tran_idx_total_list[i] == num_parser_nodes)
+
+    # key_val_2D_list, key_mask_2D_list = key_val_gen(num_transitions=num_transitions, size_of_key=size_of_key, 
+    #                               num_parser_nodes=num_parser_nodes)
+    # for i in range(len(key_val_2D_list)):
+    #     for j in range(len(key_val_2D_list[i])):
+    #         value = model.evaluate(key_val_2D_list[i][j], model_completion=True)
+    #         if value is not None:
+    #             s.add(key_val_2D_list[i][j] == value.as_long())
+    #         else:
+    #             s.add(key_val_2D_list[i][j] == 0)
+    # for i in range(len(key_mask_2D_list)):
+    #     for j in range(len(key_mask_2D_list[i])):
+    #         value = model.evaluate(key_mask_2D_list[i][j], model_completion=True)
+    #         if value is not None:
+    #             s.add(key_mask_2D_list[i][j] == value.as_long())
+    #         else:
+    #             s.add(key_mask_2D_list[i][j] == 0)
+    # tran_idx_2D_list = tran_idx_gen(num_transitions=num_transitions,num_parser_nodes=num_parser_nodes)
+    # for i in range(len(tran_idx_2D_list)):
+    #     for j in range(len(tran_idx_2D_list[i])):
+    #         value = model.evaluate(tran_idx_2D_list[i][j], model_completion=True)
+    #         if value is not None:
+    #             s.add(tran_idx_2D_list[i][j] == value.as_long())
+    #         else:
+    #             s.add(tran_idx_2D_list[i][j] == num_parser_nodes + 1)
 
     default_idx_node_list = default_idx_gen(num_parser_nodes=num_parser_nodes)
     for i in range(len(default_idx_node_list)):
@@ -702,8 +775,12 @@ def verification_step(model, cexamples):
         initial_field_value_l.append(BitVec(f'initial_field{i}', pkt_field_size_list[i]))
     O_Impl = implementation(Flags=Flags, Input_bitstream=x, idx=idx, pos=pos, 
                             random_initial_value_list=initial_field_value_l,
-                             alloc_matrix=alloc_matrix, Lookahead=Lookahead, 
-                             key_val_2D_list=key_val_2D_list, key_mask_2D_list=key_mask_2D_list, tran_idx_2D_list=tran_idx_2D_list, 
+                             alloc_matrix=alloc_matrix, Lookahead=Lookahead,
+                             assignments=assignments,
+                            key_val_total_list=key_val_total_list,
+                            key_mask_total_list=key_mask_total_list,
+                            tran_idx_total_list=tran_idx_total_list, 
+                            #  key_val_2D_list=key_val_2D_list, key_mask_2D_list=key_mask_2D_list, tran_idx_2D_list=tran_idx_2D_list, 
                              default_idx_node_list=default_idx_node_list, testcaseID=0, s=s)
     # int = 16; bitvector I should be 1 0 0 0 0 = 2**4; I[0] = 0 = 16 % 2; I[1] = 0 = 16 / 2 % 2; I[2] = 0 = 16 / 2 / 2 % 2; I[3] = 0; I[4] = 1
     # For parser, bitvector I should be 1 0 0 0 0 = 2**4; I[0] = 0 = 16 % 2; I[1] = 0 = 16 / 2 % 2; I[2] = 0 = 16 / 2 / 2 % 2; I[3] = 0; I[4] = 1
