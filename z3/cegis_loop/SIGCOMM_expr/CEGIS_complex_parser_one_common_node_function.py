@@ -36,10 +36,11 @@ seed = 42
 random.seed(seed) 
 set_param('smt.random_seed', seed)
 
-# List the parser's information
-input_bit_stream_size = 14
-num_pkt_fields = 3
-pkt_field_size_list = [8, 4, 6]
+
+input_bit_stream_size = 5
+
+pkt_field_size_list = [4, 1, 1]
+num_pkt_fields = len(pkt_field_size_list)
 
 # List the hardware configuration
 lookahead_window_size = 2
@@ -47,17 +48,26 @@ size_of_key = 2
 num_transitions = 2
 num_parser_nodes = 4
 
-# TODO: should generate the specification automatically
-# Input: Input_bitstream with the type bitVec var in z3, and initial value of all fields
-# Output: Updated value of all packet fields
+# # List the parser's information
+# input_bit_stream_size = 14
+# num_pkt_fields = 3
+# pkt_field_size_list = [8, 4, 6]
+
+# # List the hardware configuration
+# lookahead_window_size = 2
+# size_of_key = 2
+# num_transitions = 2
+# num_parser_nodes = 4
+
+
 def specification(Input_bitstream, initial_field_val_list):
     # out_field1 = BitVec(f'out_field0_{I_val}', 4)
     #      1   1  1  1 0 0 0 0 1 1 1 0 0 0
     #  pos 0   1  2  3 4
     #  idx 13 12 11 10 9 8 
-    O_field0 = Extract(input_bit_stream_size - 1, input_bit_stream_size - 1 - 8 + 1, Input_bitstream) #node 0
-    O_field1 = If(And(Extract(3, 2, O_field0) == BitVecVal(0b11, 2), Extract(1, 0, O_field0) == BitVecVal(0b11, 2)), Extract(5, 2, Input_bitstream), initial_field_val_list[1])
-    O_field2 = If(Extract(3, 0, O_field0) == BitVecVal(0b0011, 4), Extract(5, 0, Input_bitstream), initial_field_val_list[2])
+    O_field0 = Extract(input_bit_stream_size - 1, input_bit_stream_size - 1 - pkt_field_size_list[0] + 1, Input_bitstream) #node 0
+    O_field1 = If(Extract(3, 0, O_field0) == BitVecVal(0b1111, 4), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
+    O_field2 = If(Extract(3, 0, O_field0) == BitVecVal(0b0011, 4), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[2] + 1, Input_bitstream), initial_field_val_list[2])
     
     return [O_field0, O_field1, O_field2]
 
@@ -68,9 +78,9 @@ def spec(Input_bitstream, initial_list):
     # l = [int(Input_bitstream[0 : 4], 2), int(Input_bitstream[4 : 8], 2)
     Fields = ["" for _ in range(num_pkt_fields)]
     Fields[0] = Input_bitstream[0 : pkt_field_size_list[0]]
-    if Fields[0][4 : 8] == "1111":
+    if Fields[0][0 : 4] == "1111":
         Fields[1] = Input_bitstream[pkt_field_size_list[0] : pkt_field_size_list[0] + pkt_field_size_list[1]]
-    elif Fields[0][4 : 8] == "0011":
+    elif Fields[0][0 : 4] == "0011":
         Fields[2] = Input_bitstream[pkt_field_size_list[0] : pkt_field_size_list[0] + pkt_field_size_list[2]]
     l = []
     for i in range(num_pkt_fields):
@@ -79,6 +89,38 @@ def spec(Input_bitstream, initial_list):
         else:
             l.append(initial_list[i])
     return l
+# # TODO: should generate the specification automatically
+# # Input: Input_bitstream with the type bitVec var in z3, and initial value of all fields
+# # Output: Updated value of all packet fields
+# def specification(Input_bitstream, initial_field_val_list):
+#     # out_field1 = BitVec(f'out_field0_{I_val}', 4)
+#     #      1   1  1  1 0 0 0 0 1 1 1 0 0 0
+#     #  pos 0   1  2  3 4
+#     #  idx 13 12 11 10 9 8 
+#     O_field0 = Extract(input_bit_stream_size - 1, input_bit_stream_size - 1 - 8 + 1, Input_bitstream) #node 0
+#     O_field1 = If(And(Extract(3, 2, O_field0) == BitVecVal(0b11, 2), Extract(1, 0, O_field0) == BitVecVal(0b11, 2)), Extract(5, 2, Input_bitstream), initial_field_val_list[1])
+#     O_field2 = If(Extract(3, 0, O_field0) == BitVecVal(0b0011, 4), Extract(5, 0, Input_bitstream), initial_field_val_list[2])
+    
+#     return [O_field0, O_field1, O_field2]
+
+# # TODO: should generate the spec automatically
+# # Input: Input_bitstream with the type string, and initial value of all fields
+# # Output: updated fields' value in int type
+# def spec(Input_bitstream, initial_list):
+#     # l = [int(Input_bitstream[0 : 4], 2), int(Input_bitstream[4 : 8], 2)
+#     Fields = ["" for _ in range(num_pkt_fields)]
+#     Fields[0] = Input_bitstream[0 : pkt_field_size_list[0]]
+#     if Fields[0][4 : 8] == "1111":
+#         Fields[1] = Input_bitstream[pkt_field_size_list[0] : pkt_field_size_list[0] + pkt_field_size_list[1]]
+#     elif Fields[0][4 : 8] == "0011":
+#         Fields[2] = Input_bitstream[pkt_field_size_list[0] : pkt_field_size_list[0] + pkt_field_size_list[2]]
+#     l = []
+#     for i in range(num_pkt_fields):
+#         if Fields[i] != "":
+#             l.append(int(Fields[i], 2))
+#         else:
+#             l.append(initial_list[i])
+#     return l
 
 # Automaticall generate the nested ITE statement in z3
 # e.g.,
@@ -163,99 +205,6 @@ def update_extract_states(idx, Dist, extract_status, node_id, num_pkt_fields):
         ret_l.append(If(And(idx == node_id, Dist[i] == 1), 1, extract_status[i]))
     return ret_l
 
-# Behavior of parser node 0
-def node0(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, tran_idx_list, default_idx_node, extract_status, s):
-    nodeID = 0
-    key_expr_list = generate_key_expr_list(pos, I, Dist, F, alloc_matrix)
-    update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, node_id = nodeID)
-    post_pos = post_node_pos(idx = idx, Dist = Dist, node_id = nodeID, alloc_matrix=alloc_matrix, pos = pos)
-
-    extract_status = update_extract_states(idx = idx, Dist=Dist, extract_status=extract_status, 
-                                                node_id=nodeID, num_pkt_fields=num_pkt_fields)
-    key_sel = generate_tran_key(alloc_matrix = alloc_matrix, node_id = nodeID, 
-                                update_field_val_l = update_field_val_l, 
-                                post_node_pos = post_pos, Lookahead=Lookahead, I = I, extract_status=extract_status, s = s)
-    
-    # State transition
-    key_val_list = key_val_list
-    tran_idx_list = tran_idx_list
-    default_idx_node = default_idx_node
-    # Build the state transition logic with a for loop
-    ret_idx = generate_return_idx(key_val_list, tran_idx_list, 
-                                  default_idx_node, num_transitions, size_of_key, key_sel,
-                                  idx, node_id = nodeID)
-    
-    return update_field_val_l, post_pos, ret_idx, extract_status
-
-# Behavior of parser node 1
-def node1(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, tran_idx_list, default_idx_node, extract_status, s):
-    nodeID = 1
-    key_expr_list = generate_key_expr_list(pos, I, Dist, F, alloc_matrix)
-    update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, node_id = nodeID)
-    post_pos = post_node_pos(idx = idx, Dist = Dist, node_id = nodeID, alloc_matrix=alloc_matrix, pos = pos)
-    extract_status = update_extract_states(idx = idx, Dist=Dist, extract_status=extract_status, 
-                                                node_id=nodeID, num_pkt_fields=num_pkt_fields)
-    key_sel = generate_tran_key(alloc_matrix = alloc_matrix, node_id = nodeID, 
-                                update_field_val_l = update_field_val_l, 
-                                post_node_pos = post_pos, Lookahead=Lookahead, I = I, extract_status=extract_status, s = s)
-    
-    # State transition
-    key_val_list = key_val_list
-    tran_idx_list = tran_idx_list
-    default_idx_node = default_idx_node
-    # Build the state transition logic with a for loop
-    ret_idx = generate_return_idx(key_val_list, tran_idx_list, 
-                                  default_idx_node, num_transitions, size_of_key, key_sel,
-                                  idx, node_id = nodeID)
-    
-    return update_field_val_l, post_pos, ret_idx, extract_status
-
-# Behavior of parser node 2
-def node2(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, tran_idx_list, default_idx_node, extract_status, s):
-    nodeID = 2
-    key_expr_list = generate_key_expr_list(pos, I, Dist, F, alloc_matrix)
-    update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, node_id = nodeID)
-    post_pos = post_node_pos(idx = idx, Dist = Dist, node_id = nodeID, alloc_matrix=alloc_matrix, pos = pos)
-    extract_status = update_extract_states(idx = idx, Dist=Dist, extract_status=extract_status, 
-                                                node_id=nodeID, num_pkt_fields=num_pkt_fields)
-    key_sel = generate_tran_key(alloc_matrix = alloc_matrix, node_id = nodeID, 
-                                update_field_val_l = update_field_val_l, 
-                                post_node_pos = post_pos, Lookahead=Lookahead, I = I, extract_status=extract_status, s = s)
-    
-    # State transition
-    key_val_list = key_val_list
-    tran_idx_list = tran_idx_list
-    default_idx_node = default_idx_node
-    # Build the state transition logic with a for loop
-    ret_idx = generate_return_idx(key_val_list, tran_idx_list, 
-                                  default_idx_node, num_transitions, size_of_key, key_sel,
-                                  idx, node_id = nodeID)
-    
-    return update_field_val_l, post_pos, ret_idx, extract_status
-
-# Behavior of parser node 3
-def node3(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, tran_idx_list, default_idx_node, extract_status, s):
-    nodeID = 3
-    key_expr_list = generate_key_expr_list(pos, I, Dist, F, alloc_matrix)
-    update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, node_id = nodeID)
-    post_pos = post_node_pos(idx = idx, Dist = Dist, node_id = nodeID, alloc_matrix=alloc_matrix, pos = pos)
-    extract_status = update_extract_states(idx = idx, Dist=Dist, extract_status=extract_status, 
-                                                node_id=nodeID, num_pkt_fields=num_pkt_fields)
-    key_sel = generate_tran_key(alloc_matrix = alloc_matrix, node_id = nodeID, 
-                                update_field_val_l = update_field_val_l, 
-                                post_node_pos = post_pos, Lookahead=Lookahead, I = I, extract_status=extract_status, s = s)
-    
-    # State transition
-    key_val_list = key_val_list
-    tran_idx_list = tran_idx_list
-    default_idx_node = default_idx_node
-    # Build the state transition logic with a for loop
-    ret_idx = generate_return_idx(key_val_list, tran_idx_list, 
-                                  default_idx_node, num_transitions, size_of_key, key_sel,
-                                  idx, node_id = nodeID)
-    
-    return update_field_val_l, post_pos, ret_idx, extract_status
-
 def new_node(nodeID, Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, tran_idx_list, default_idx_node, extract_status, s):
     key_expr_list = generate_key_expr_list(pos, I, Dist, F, alloc_matrix)
     update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, node_id = nodeID)
@@ -280,10 +229,10 @@ def new_node(nodeID, Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list
 # Function to generate temporary BitVec variables for each iteration
 def temporary_bitvec_for_counterexample(I_val, random_initial_value_list, num_pkt_fields, testcaseID):
     # Dynamically create new BitVec variable for this iteration
-    Input_bitstream = BitVec(f'Input_bitstream_{testcaseID}', 14)  # 8-bit for example, can be adjusted
-    input_field0 = BitVec(f'input_field0_{testcaseID}', 8)
-    input_field1 = BitVec(f'input_field1_{testcaseID}', 4)
-    input_field2 = BitVec(f'input_field2_{testcaseID}', 6)
+    Input_bitstream = BitVec(f'Input_bitstream_{testcaseID}', input_bit_stream_size)  # 8-bit for example, can be adjusted
+    input_field0 = BitVec(f'input_field0_{testcaseID}', pkt_field_size_list[0])
+    input_field1 = BitVec(f'input_field1_{testcaseID}', pkt_field_size_list[1])
+    input_field2 = BitVec(f'input_field2_{testcaseID}', pkt_field_size_list[2])
     
     extract_status = []
     for i in range(num_pkt_fields):
@@ -308,33 +257,36 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                                                                                                          random_initial_value_list=random_initial_value_list, 
                                                                                                          num_pkt_fields=num_pkt_fields, testcaseID=testcaseID)
     s.add(temp_constraint)
-
-    # Using for loop to replace the iterative accessing the node function
-    # nodes = [] # list of function names
-    # for i in range(num_parser_nodes):
-    #     node_function = globals()[f'node{i}']  # Access the function dynamically by its name
-    #     nodes.append(node_function)
+    
     Out_Fields = Input_Fields
     post_extract_status=extract_status
     post_pos = pos
-    # print("num_parser_nodes:", num_parser_nodes)
-    for i in range(num_parser_nodes+1):
-        for node_id in range(num_parser_nodes):
-            # First evaluate the function call
-            new_fields, new_pos, new_idx, new_status = new_node(
-                node_id, Flags[node_id], Out_Fields, Input_bitstream,
-                idx=idx, pos=post_pos, alloc_matrix=alloc_matrix,
-                Lookahead=Lookahead,
-                key_val_list=key_val_2D_list[node_id],
-                tran_idx_list=tran_idx_2D_list[node_id],
-                default_idx_node=default_idx_node_list[node_id],
-                extract_status=post_extract_status, s=s)
-            
-            # Apply If to each component separately
-            Out_Fields = [If(idx == node_id, then_ele, else_ele) for then_ele, else_ele in zip(new_fields, Out_Fields)]
-            post_pos = If(idx == node_id, new_pos, post_pos)
-            idx = If(idx == node_id, new_idx, idx)
-            post_extract_status = [If(idx == node_id, then_ele, else_ele) for then_ele, else_ele in zip(new_status, post_extract_status)]
+    # always visit node 0 in the beginning
+    Out_Fields, post_pos, idx, post_extract_status = new_node(0, Flags[0], Out_Fields, Input_bitstream, 
+                                                                        idx=idx, pos=post_pos, alloc_matrix=alloc_matrix, 
+                                                                        Lookahead=Lookahead, 
+                                                                        key_val_list=key_val_2D_list[0], 
+                                                                        tran_idx_list=tran_idx_2D_list[0], 
+                                                                        default_idx_node=default_idx_node_list[0], 
+                                                                        extract_status=post_extract_status, s=s)
+    for k in range(3):
+        results = []
+        for i in range(num_parser_nodes):
+            condition = idx == i
+            out_fields, post_pos_i, idx_i, post_extract_status_i = new_node(
+                i,
+                Flags[i], Out_Fields, Input_bitstream, idx=idx, pos=post_pos, alloc_matrix=alloc_matrix,
+                Lookahead=Lookahead, key_val_list=key_val_2D_list[i], tran_idx_list=tran_idx_2D_list[i],
+                default_idx_node=default_idx_node_list[i], extract_status=post_extract_status, s=s
+            )
+            results.append((condition, out_fields, post_pos_i, idx_i, post_extract_status_i))
+
+        # Process the results to update Out_Fields, post_pos, idx, and post_extract_status
+        for condition, out_fields_i, post_pos_i, idx_i, post_extract_status_i in results:
+            Out_Fields = [If(condition, then_ele, else_ele) for then_ele, else_ele in zip(out_fields_i, Out_Fields)]
+            post_pos = If(condition, post_pos_i, post_pos)
+            idx = If(condition, idx_i, idx)
+            post_extract_status = [If(condition, then_ele, else_ele) for then_ele, else_ele in zip(post_extract_status_i, post_extract_status)]
 
     return Out_Fields
 
@@ -418,6 +370,7 @@ def synthesis_step(cexamples):
     # Define all variables
     s = Solver()
     s.reset()
+    # s.set("parallel.enable", True)
     # s.set("incremental", True)
 
 
@@ -460,7 +413,8 @@ def synthesis_step(cexamples):
         for j in range(len(cexamples)):
             Input_bitval = cexamples[j][0]
             random_initial_value_list = cexamples[j][1:]
-            spec_out = spec(format(Input_bitval, '014b'), random_initial_value_list)
+            spec_out = spec(format(Input_bitval, '0{size}b'.format(size=input_bit_stream_size)), random_initial_value_list)
+            # spec_out = spec(format(Input_bitval, '014b'), random_initial_value_list)
             impl_out = implementation(Flags, Input_bitval, idx, pos, random_initial_value_list, 
                                       alloc_matrix, Lookahead, 
                                       key_val_2D_list=key_val_2D_list, 
