@@ -45,10 +45,9 @@ num_pkt_fields = len(pkt_field_size_list)
 # List the hardware configuration
 lookahead_window_size = 2
 size_of_key = 2
-num_transitions = 2
 num_parser_nodes = 4
 
-tcam_num = 10
+tcam_num = 5
 
 # TODO: should generate the specification automatically
 # Input: Input_bitstream with the type bitVec var in z3, and initial value of all fields
@@ -91,11 +90,7 @@ def spec(Input_bitstream, initial_list):
 #                         ...
 #                         If(And(Dist[0] == 1, pos == 6), Extract(7, 0, I),
 #                                 F[0])))))))
-def dynamic_extract_loop(pos, I, Dist, F, field_size, field_id):
-    # a trick to avoid the case where there is no sufficient length to extract
-    # TODO: try to find a way to solve this problem fundamentally
-    if input_bit_stream_size - field_size < 0:
-        return BitVecVal(0, field_size)
+def dynamic_extract_loop(s, pos, I, Dist, F, field_size, field_id):
     expr = F
     for i in range(input_bit_stream_size - field_size + 1):
         start = input_bit_stream_size - 1 - i
@@ -106,10 +101,10 @@ def dynamic_extract_loop(pos, I, Dist, F, field_size, field_id):
         expr = If(And(Dist[field_id] == 1, pos == i), Extract(start, end, I), expr)
     return expr
 
-def generate_key_expr_list(pos, I, Dist, F, alloc_matrix):
+def generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix):
     ret_l = []
     for i in range(len(alloc_matrix)):
-        ret_l.append(dynamic_extract_loop(pos, I, Dist, F[i], len(alloc_matrix[i]), field_id=i))
+        ret_l.append(dynamic_extract_loop(s, pos, I, Dist, F[i], len(alloc_matrix[i]), field_id=i))
     return ret_l
 
 def generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id):
@@ -155,7 +150,7 @@ def post_node_pos(idx, Dist, node_id, alloc_matrix, pos):
     return If(idx == node_id, result, pos)
 
 # def generate_return_idx(key_val_list, key_mask_list, tran_idx_list, default_idx_node1, num_transitions, size_of_key, key_sel, idx, node_id):
-def generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node1, num_transitions, size_of_key, key_sel, idx, node_id):
+def generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node1, size_of_key, key_sel, idx, node_id):
     ret_idx = default_idx_node1  # Default case
     # Reverse the order because we want to make the TCAM entry with smaller number to dominate the transition logic
     for i in range(tcam_num - 1, -1, -1):
@@ -178,8 +173,8 @@ def update_extract_states(idx, Dist, extract_status, node_id, num_pkt_fields):
 def node0(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
     nodeID = 0
     # for i in range(num_pkt_fields):
-    #     s.add(Implies(Dist[i] == 1, pos + pkt_field_size_list[i] < input_bit_stream_size))
-    key_expr_list = generate_key_expr_list(pos, I, Dist, F, alloc_matrix)
+    #     s.add(Implies(And(Dist[i] == 1, idx == nodeID), pos + pkt_field_size_list[i] < input_bit_stream_size))
+    key_expr_list = generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix)
     update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id = nodeID)
     post_pos = post_node_pos(idx = idx, Dist = Dist, node_id = nodeID, alloc_matrix=alloc_matrix, pos = pos)
 
@@ -198,7 +193,7 @@ def node0(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_to
     #                               default_idx_node, num_transitions, size_of_key, key_sel,
     #                               idx, node_id = nodeID)
     ret_idx = generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, 
-                                  default_idx_node, num_transitions, size_of_key, key_sel,
+                                  default_idx_node, size_of_key, key_sel,
                                   idx, node_id = nodeID)
     
     return update_field_val_l, post_pos, ret_idx, extract_status
@@ -207,7 +202,9 @@ def node0(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_to
 # def node1(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_list, tran_idx_list, default_idx_node, extract_status, s):
 def node1(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
     nodeID = 1
-    key_expr_list = generate_key_expr_list(pos, I, Dist, F, alloc_matrix)
+    # for i in range(num_pkt_fields):
+    #     s.add(Implies(And(Dist[i] == 1, idx == nodeID), pos + pkt_field_size_list[i] < input_bit_stream_size))
+    key_expr_list = generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix)
     update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id = nodeID)
     post_pos = post_node_pos(idx = idx, Dist = Dist, node_id = nodeID, alloc_matrix=alloc_matrix, pos = pos)
     extract_status = update_extract_states(idx = idx, Dist=Dist, extract_status=extract_status, 
@@ -222,7 +219,7 @@ def node1(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_to
     # default_idx_node = default_idx_node
     # Build the state transition logic with a for loop
     ret_idx = generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list,  
-                                  default_idx_node, num_transitions, size_of_key, key_sel,
+                                  default_idx_node, size_of_key, key_sel,
                                   idx, node_id = nodeID)
     
     return update_field_val_l, post_pos, ret_idx, extract_status
@@ -231,7 +228,9 @@ def node1(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_to
 # def node2(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_list, tran_idx_list, default_idx_node, extract_status, s):
 def node2(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
     nodeID = 2
-    key_expr_list = generate_key_expr_list(pos, I, Dist, F, alloc_matrix)
+    # for i in range(num_pkt_fields):
+    #     s.add(Implies(And(Dist[i] == 1, idx == nodeID), pos + pkt_field_size_list[i] < input_bit_stream_size))
+    key_expr_list = generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix)
     update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id = nodeID)
     post_pos = post_node_pos(idx = idx, Dist = Dist, node_id = nodeID, alloc_matrix=alloc_matrix, pos = pos)
     extract_status = update_extract_states(idx = idx, Dist=Dist, extract_status=extract_status, 
@@ -246,7 +245,7 @@ def node2(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_to
     # default_idx_node = default_idx_node
     # Build the state transition logic with a for loop
     ret_idx = generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, 
-                                  default_idx_node, num_transitions, size_of_key, key_sel,
+                                  default_idx_node, size_of_key, key_sel,
                                   idx, node_id = nodeID)
     
     return update_field_val_l, post_pos, ret_idx, extract_status
@@ -255,7 +254,9 @@ def node2(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_to
 # def node3(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_list, tran_idx_list, default_idx_node, extract_status, s):
 def node3(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
     nodeID = 3
-    key_expr_list = generate_key_expr_list(pos, I, Dist, F, alloc_matrix)
+    # for i in range(num_pkt_fields):
+    #     s.add(Implies(And(Dist[i] == 1, idx == nodeID), pos + pkt_field_size_list[i] < input_bit_stream_size))
+    key_expr_list = generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix)
     update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id = nodeID)
     post_pos = post_node_pos(idx = idx, Dist = Dist, node_id = nodeID, alloc_matrix=alloc_matrix, pos = pos)
     extract_status = update_extract_states(idx = idx, Dist=Dist, extract_status=extract_status, 
@@ -270,7 +271,7 @@ def node3(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_to
     # default_idx_node = default_idx_node
     # Build the state transition logic with a for loop
     ret_idx = generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, 
-                                  default_idx_node, num_transitions, size_of_key, key_sel,
+                                  default_idx_node, size_of_key, key_sel,
                                   idx, node_id = nodeID)
     
     return update_field_val_l, post_pos, ret_idx, extract_status
@@ -558,28 +559,6 @@ def lookahead_gen(num_parser_nodes, lookahead_window_size):
             node_ahead.append(Int(f'node{i}_ahead{j}'))  # Dynamically create variable names like node0_ahead0
         Lookahead.append(node_ahead)  # Append the node lookahead list to Lookahead
     return Lookahead
-
-# Generate values to match in each parser node's state transition
-# e.g., key_val0_node0 = BitVec('key_val0_node0', size_of_key)
-def key_val_gen(num_transitions, size_of_key, num_parser_nodes):
-    key_val_2D_list = []
-    for nodeID in range(num_parser_nodes):
-        row = [BitVec(f'key_val{i}_node{nodeID}', size_of_key) for i in range(num_transitions)]
-        key_val_2D_list.append(row)
-    key_mask_2D_list = []
-    for nodeID in range(num_parser_nodes):
-        row = [BitVec(f'key_mask{i}_node{nodeID}', size_of_key) for i in range(num_transitions)]
-        key_mask_2D_list.append(row)
-    return key_val_2D_list, key_mask_2D_list
-
-# Generate transition index in each parser node's state transition
-# e.g., tran_idx0_node0 = Int('tran_idx0_node0')
-def tran_idx_gen(num_transitions, num_parser_nodes):
-    tran_idx_2D_list = []
-    for nodeID in range(num_parser_nodes):
-        row=[Int(f'tran_idx{i}_node{nodeID}') for i in range(num_transitions)]
-        tran_idx_2D_list.append(row)
-    return tran_idx_2D_list
 
 # Generate default transition index in each parser node
 # e.g., default_idx_node0 = Int('default_idx_node0')
