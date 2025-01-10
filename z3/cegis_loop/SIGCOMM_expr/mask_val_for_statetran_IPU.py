@@ -156,7 +156,7 @@ def generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tr
     # Reverse the order because we want to make the TCAM entry with smaller number to dominate the transition logic
     for i in range(tcam_num - 1, -1, -1):
         # key_val_list = BitVec(name, size_of_key);
-        ret_idx = If(And(assignments[i] == node_id, (Extract(size_of_key - 1, 0, key_sel) & key_mask_total_list[i]) == key_val_total_list[i]), tran_idx_total_list[i], ret_idx)
+        ret_idx = If(And(assignments[i] == node_id, (Extract(size_of_key - 1, 0, key_sel) & key_mask_total_list[i]) == (key_val_total_list[i] & key_mask_total_list[i])), tran_idx_total_list[i], ret_idx)
 
     # Final state transition for idx == 1
     ret_idx = If(idx == node_id, ret_idx, idx)
