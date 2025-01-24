@@ -1,11 +1,11 @@
-# #include <core.p4>
-# #if __TARGET_TOFINO__ == 3
-# #include <t3na.p4>
-# #elif __TARGET_TOFINO__ == 2
-# #include <t2na.p4>
-# #else
-# #include <tna.p4>
-# #endif
+#include <core.p4>
+#if __TARGET_TOFINO__ == 3
+#include <t3na.p4>
+#elif __TARGET_TOFINO__ == 2
+#include <t2na.p4>
+#else
+#include <tna.p4>
+#endif
 
 header data_t {
     bit<8> f8;
@@ -39,7 +39,7 @@ parser ParserI(packet_in b,
     }
     state ethernet {
         b.extract(hdr.data1);
-        transition select(hdr.data1.f16[9], hdr.data1.f16[15], hdr.data1.f16[14], hdr.data1.f16[13], hdr.data1.f16[12], hdr.data1.f16[11]) {
+        transition select(hdr.data1.f16[9:9], hdr.data1.f16[15:15], hdr.data1.f16[14:14], hdr.data1.f16[13:13], hdr.data1.f16[12:12], hdr.data1.f16[11:11]) {
             (1w0 &&& 1w1, 1w0 &&& 1w1,1w0 &&& 1w1,1w0 &&& 1w1,1w0 &&& 1w1,1w0 &&& 1w1) : parse_llc_header;
             default: accept;
         }
