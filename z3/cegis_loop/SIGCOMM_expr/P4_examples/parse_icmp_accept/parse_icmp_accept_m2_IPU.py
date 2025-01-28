@@ -12,12 +12,15 @@ from practical_ex.code_gen_IPU import *
 
 """
 spec:
+state start {
+    transition parse_icmp;
+}
+
 state parse_icmp {
     b.extract(hdr.icmp);
-    transition select(hdr.icmp.typeCode) {
-        16w0x8200 &&& 16w0xfe00: parse_set_prio_med;
-        16w0x8400 &&& 16w0xfc00: parse_set_prio_med;
-        16w0x8800 &&& 16w0xff00: parse_set_prio_med;
+    transition select(hdr.icmp.typeCode[15:12], hdr.icmp.typeCode[11:8]) {
+        (4w0x8, 4w0x0 &&& 4w0xe): accept;
+        (4w0x8, _): parse_set_prio_med;
         default: accept;
     }
 }
@@ -52,9 +55,11 @@ def specification(Input_bitstream, initial_field_val_list):
     #  pos 0   1  2  3 4
     #  idx 13 12 11 10 9 8 
     O_field0 = Extract(input_bit_stream_size - 1, input_bit_stream_size - 1 - pkt_field_size_list[0] + 1, Input_bitstream) #node 0
-    O_field1 = If((Extract(31, 31-15, O_field0) & BitVecVal(0xfe00, 16)) == (BitVecVal(0x8200, 16) & BitVecVal(0xfe00, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
-    O_field1 = If((Extract(31, 31-15, O_field0) & BitVecVal(0xfc00, 16)) == (BitVecVal(0x8400, 16) & BitVecVal(0xfc00, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), O_field1)
-    O_field1 = If((Extract(31, 31-15, O_field0) & BitVecVal(0xff00, 16)) == (BitVecVal(0x8800, 16) & BitVecVal(0xff00, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), O_field1)
+
+    Condition_to_N1 = Extract(31, 28, O_field0) == BitVecVal(0x8, 4)
+    Condition_to_N2 = Extract(27, 24, O_field0) & BitVecVal(0xe, 4) == BitVecVal(0x0, 4) & BitVecVal(0xe, 4)
+    O_field1 = If(And(Condition_to_N1, Condition_to_N2), initial_field_val_list[1],
+                  If(Condition_to_N1, Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1]))
     
     return [O_field0, O_field1]
 
@@ -65,8 +70,9 @@ def spec(Input_bitstream, initial_list):
     # l = [int(Input_bitstream[0 : 4], 2), int(Input_bitstream[4 : 8], 2)
     Fields = ["" for _ in range(num_pkt_fields)]
     Fields[0] = Input_bitstream[0 : pkt_field_size_list[0]]
-    if ((int(Fields[0][0 : 16], 2) & int("1111111000000000", 2)) == int("1000001000000000", 2) & int("1111111000000000", 2)) or ((int(Fields[0][0 : 16], 2) & int("1111110000000000", 2)) == int("1000010000000000", 2) & int("1111110000000000", 2)) or ((int(Fields[0][0 : 16], 2) & int("1111111100000000", 2)) == int("1000100000000000", 2) & int("1111111100000000", 2)):
+    if int(Fields[0][0 : 4], 2) == int("1000", 2) and (int(Fields[0][4 : 8], 2) & int("1110", 2)) != int("0000", 2):
         Fields[1] = Input_bitstream[pkt_field_size_list[0] : pkt_field_size_list[0] + pkt_field_size_list[1]]
+
 
     l = []
     for i in range(num_pkt_fields):

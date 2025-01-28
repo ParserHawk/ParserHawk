@@ -402,7 +402,7 @@ def assignment_gen(stage_num, tcam_num):
     for i in range(stage_num):
         assign = []
         for j in range(tcam_num):
-            assign.append(Int(f'assign_stage_{j}_tcam{i}'))
+            assign.append(Int(f'assign_stage_{i}_tcam{j}'))
         assignments.append(assign)
     return assignments
 
@@ -411,7 +411,7 @@ def key_val_gen(stage_num, tcam_num):
     for i in range(stage_num):
         key_val_l = []
         for j in range(tcam_num):
-            key_val_l.append(BitVec(f'key_val_stage_{j}_tcam{i}',size_of_key))
+            key_val_l.append(BitVec(f'key_val_stage_{i}_tcam{j}',size_of_key))
         key_val_total_list.append(key_val_l)
     return key_val_total_list
 
@@ -420,7 +420,7 @@ def key_mask_gen(stage_num, tcam_num):
     for i in range(stage_num):
         key_mask_l = []
         for j in range(tcam_num):
-            key_mask_l.append(BitVec(f'key_mask_stage_{j}_tcam{i}',size_of_key))
+            key_mask_l.append(BitVec(f'key_mask_stage_{i}_tcam{j}',size_of_key))
         key_mask_total_list.append(key_mask_l)
     return key_mask_total_list
 
@@ -429,7 +429,7 @@ def tran_id_gen(stage_num, tcam_num):
     for i in range(stage_num):
         tran_idx_l = []
         for j in range(tcam_num):
-            tran_idx_l.append(Int(f'tran_idx_stage_{j}_tcam{i}'))
+            tran_idx_l.append(Int(f'tran_idx_stage_{i}_tcam{j}'))
         tran_idx_total_list.append(tran_idx_l)
     return tran_idx_total_list
 
