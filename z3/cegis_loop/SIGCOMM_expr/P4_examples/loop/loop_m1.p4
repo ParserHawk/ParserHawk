@@ -32,7 +32,6 @@ struct headers {
     ethernet_t eth;
     mpls_t     mpls0;
     mpls_t     mpls1;
-    mpls_t     mpls2;
 }
 
 struct metadata { 
@@ -62,15 +61,7 @@ parser ParserI(packet_in b,
     state parse_mpls1 {
         b.extract(hdr.mpls1);
         transition select(hdr.mpls1.bos) {
-            1w0: parse_mpls2;
-            1w1: parse_mpls_bos;
-            default: accept;
-        }
-    }
-    state parse_mpls2 {
-        b.extract(hdr.mpls2);
-        transition select(hdr.mpls2.bos) {
-            1w0: parse_mpls2;
+            1w0: parse_mpls1;
             1w1: parse_mpls_bos;
             default: accept;
         }

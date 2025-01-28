@@ -30,7 +30,7 @@ struct headers {
     ipv4_t ipv4;
     ipv6_t ipv6;
     ethernet_t eth;
-    mpls_t[3]                               mpls;
+    mpls_t[2]                               mpls;
 }
 
 struct metadata { 
