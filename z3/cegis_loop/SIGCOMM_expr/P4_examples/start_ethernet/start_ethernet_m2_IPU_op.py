@@ -15,8 +15,7 @@ spec:
 Node0:
 extract(hdr.data1); // bit<24> data1; --> field0
 transition select(hdr.data1.f16) {
-    16w0 &&& 16w0xfe00: Node1;
-    16w0 &&& 16w0xfa00: Node1;
+    16w0 &&& 16w0xfa00: parse_llc_header;
     16w0x88cc: Node2;
     16w0x8809: Node2;
     default: accept;
@@ -53,8 +52,7 @@ def specification(Input_bitstream, initial_field_val_list):
     #  pos 0   1  2  3 4
     #  idx 13 12 11 10 9 8 
     O_field0 = Extract(input_bit_stream_size - 1, input_bit_stream_size - 1 - pkt_field_size_list[0] + 1, Input_bitstream) #node 0
-    O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0b1111111000000000, 16)) == (BitVecVal(0b0000000000000000, 16) & BitVecVal(0b1111111000000000, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
-    O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0b1111101000000000, 16)) == (BitVecVal(0b0000000000000000, 16) & BitVecVal(0b1111101000000000, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), O_field1)
+    O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0xfa00, 16)) == (BitVecVal(0x0000, 16) & BitVecVal(0xfa00, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
     
     return [O_field0, O_field1]
 
@@ -65,7 +63,7 @@ def spec(Input_bitstream, initial_list):
     # l = [int(Input_bitstream[0 : 4], 2), int(Input_bitstream[4 : 8], 2)
     Fields = ["" for _ in range(num_pkt_fields)]
     Fields[0] = Input_bitstream[0 : pkt_field_size_list[0]]
-    if ((int(Fields[0][0 : 16], 2) & int("1111111000000000", 2)) == int("0000000000000000", 2)) or ((int(Fields[0][0 : 16], 2) & int("1111101000000000", 2)) == int("0000000000000000", 2)):
+    if ((int(Fields[0][0 : 16], 2) & int("1111101000000000", 2)) == int("0000000000000000", 2)):
         Fields[1] = Input_bitstream[pkt_field_size_list[0] : pkt_field_size_list[0] + pkt_field_size_list[1]]
     l = []
     for i in range(num_pkt_fields):

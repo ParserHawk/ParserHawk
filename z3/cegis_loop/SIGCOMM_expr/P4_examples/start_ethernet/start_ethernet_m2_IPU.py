@@ -15,8 +15,7 @@ spec:
 Node0:
 extract(hdr.data1); // bit<24> data1; --> field0
 transition select(hdr.data1.f16) {
-    16w0 &&& 16w0xfe00: Node1;
-    16w0 &&& 16w0xfa00: Node1;
+    16w0 &&& 16w0xfa00: parse_llc_header;
     16w0x88cc: Node2;
     16w0x8809: Node2;
     default: accept;
@@ -29,19 +28,19 @@ Node2:
 accept;
 """
 
-input_bit_stream_size = 16+1
+input_bit_stream_size = 24+8
 
-
-pkt_field_size_list = [16, 1]
+pkt_field_size_list = [24, 8]
 num_pkt_fields = len(pkt_field_size_list)
 
 # List the hardware configuration
 lookahead_window_size = 2
-size_of_key = 6
+size_of_key = 16
 
 parser_node_pipe = [1,1]
 num_parser_nodes = sum(parser_node_pipe)
-tcam_num = 1
+tcam_num = 2
+
 
 
 # TODO: should generate the specification automatically
@@ -53,8 +52,7 @@ def specification(Input_bitstream, initial_field_val_list):
     #  pos 0   1  2  3 4
     #  idx 13 12 11 10 9 8 
     O_field0 = Extract(input_bit_stream_size - 1, input_bit_stream_size - 1 - pkt_field_size_list[0] + 1, Input_bitstream) #node 0
-    O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0b1111111000000000, 16)) == (BitVecVal(0b0000000000000000, 16) & BitVecVal(0b1111111000000000, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
-    O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0b1111101000000000, 16)) == (BitVecVal(0b0000000000000000, 16) & BitVecVal(0b1111101000000000, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), O_field1)
+    O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0xfa00, 16)) == (BitVecVal(0b0000000000000000, 16) & BitVecVal(0xfa00, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
     
     return [O_field0, O_field1]
 
@@ -65,7 +63,7 @@ def spec(Input_bitstream, initial_list):
     # l = [int(Input_bitstream[0 : 4], 2), int(Input_bitstream[4 : 8], 2)
     Fields = ["" for _ in range(num_pkt_fields)]
     Fields[0] = Input_bitstream[0 : pkt_field_size_list[0]]
-    if ((int(Fields[0][0 : 16], 2) & int("1111111000000000", 2)) == int("0000000000000000", 2)) or ((int(Fields[0][0 : 16], 2) & int("1111101000000000", 2)) == int("0000000000000000", 2)):
+    if ((int(Fields[0][8 : 24], 2) & int("1111101000000000", 2)) == int("0000000000000000", 2)):
         Fields[1] = Input_bitstream[pkt_field_size_list[0] : pkt_field_size_list[0] + pkt_field_size_list[1]]
     l = []
     for i in range(num_pkt_fields):
@@ -113,9 +111,9 @@ def generate_tran_key(alloc_matrix, node_id, update_field_val_l,
     s.add(dummy == 0)
     key_sel = None
     # Only extracted fields can be used as the state transition key
-    # for i in range(len(alloc_matrix)):
-    #     for j in range(len(alloc_matrix[i])):
-    #         s.add(Implies(alloc_matrix[i][j] == node_id, extract_status[i] == 1))
+    for i in range(len(alloc_matrix)):
+        for j in range(len(alloc_matrix[i])):
+            s.add(Implies(alloc_matrix[i][j] == node_id, extract_status[i] == 1))
 
     for i in range(len(alloc_matrix)):
         for j in range(len(alloc_matrix[i]) - 1, -1, -1):
@@ -160,6 +158,36 @@ def update_extract_states(idx, Dist, extract_status, node_id, num_pkt_fields):
     for i in range(num_pkt_fields):
         ret_l.append(If(And(idx == node_id, Dist[i] == 1), 1, extract_status[i]))
     return ret_l
+
+# Behavior of parser node 0
+# def node0(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_list, tran_idx_list, default_idx_node, extract_status, s):
+def node0(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
+    nodeID = 0
+    # for i in range(num_pkt_fields):
+    #     s.add(Implies(And(Dist[i] == 1, idx == nodeID), pos + pkt_field_size_list[i] < input_bit_stream_size))
+    key_expr_list = generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix)
+    update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id = nodeID)
+    post_pos = post_node_pos(idx = idx, Dist = Dist, node_id = nodeID, alloc_matrix=alloc_matrix, pos = pos)
+
+    extract_status = update_extract_states(idx = idx, Dist=Dist, extract_status=extract_status, 
+                                                node_id=nodeID, num_pkt_fields=num_pkt_fields)
+    key_sel = generate_tran_key(alloc_matrix = alloc_matrix, node_id = nodeID, 
+                                update_field_val_l = update_field_val_l, 
+                                post_node_pos = post_pos, Lookahead=Lookahead, I = I, extract_status=extract_status, s = s)
+    
+    # State transition
+    # key_val_list = key_val_list
+    # tran_idx_list = tran_idx_list
+    # default_idx_node = default_idx_node
+    # Build the state transition logic with a for loop
+    # ret_idx = generate_return_idx(key_val_list, key_mask_list, tran_idx_list, 
+    #                               default_idx_node, num_transitions, size_of_key, key_sel,
+    #                               idx, node_id = nodeID)
+    ret_idx = generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, 
+                                  default_idx_node, size_of_key, key_sel,
+                                  idx, node_id = nodeID)
+    
+    return update_field_val_l, post_pos, ret_idx, extract_status
 
 def new_node(nodeID, Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
     key_expr_list = generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix)
