@@ -233,7 +233,7 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                                                                         tran_idx_total_list=tran_idx_total_list,
                                                                         default_idx_node=default_idx_node_list[0], 
                                                                         extract_status=post_extract_status, s=s)
-    for k in range(3):
+    for k in range(1):
         results = []
         for i in range(num_parser_nodes):
             condition = idx == i
@@ -342,7 +342,8 @@ def synthesis_step(cexamples):
     for i in range(num_parser_nodes):
         for j in range(num_pkt_fields):
             s.add(Or(Flags[i][j] == 0, Flags[i][j] == 1))
-
+    s.add(Flags[0][0] == 1)
+    s.add(Flags[1][1] == 1)
     idx = Int('idx')
     s.add(idx == 0)
     pos = Int('pos')

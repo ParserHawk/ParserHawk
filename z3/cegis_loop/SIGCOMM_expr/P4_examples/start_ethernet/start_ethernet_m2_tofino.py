@@ -31,14 +31,14 @@ accept;
 """
 
 
-input_bit_stream_size = 16+1
+input_bit_stream_size = 24+8
 
-pkt_field_size_list = [16, 1]
+pkt_field_size_list = [24, 8]
 num_pkt_fields = len(pkt_field_size_list)
 
 # List the hardware configuration
 lookahead_window_size = 2
-size_of_key = 16
+size_of_key = 6
 num_parser_nodes = 2
 tcam_num = 1
 
@@ -51,8 +51,7 @@ def specification(Input_bitstream, initial_field_val_list):
     #  pos 0   1  2  3 4
     #  idx 13 12 11 10 9 8 
     O_field0 = Extract(input_bit_stream_size - 1, input_bit_stream_size - 1 - pkt_field_size_list[0] + 1, Input_bitstream) #node 0
-    O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0b1111111000000000, 16)) == (BitVecVal(0b0000000000000000, 16) & BitVecVal(0b1111111000000000, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
-    O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0b1111101000000000, 16)) == (BitVecVal(0b0000000000000000, 16) & BitVecVal(0b1111101000000000, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), O_field1)
+    O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0xfa00, 16)) == (BitVecVal(0b0000000000000000, 16) & BitVecVal(0xfa00, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
     
     return [O_field0, O_field1]
 
@@ -63,7 +62,7 @@ def spec(Input_bitstream, initial_list):
     # l = [int(Input_bitstream[0 : 4], 2), int(Input_bitstream[4 : 8], 2)
     Fields = ["" for _ in range(num_pkt_fields)]
     Fields[0] = Input_bitstream[0 : pkt_field_size_list[0]]
-    if ((int(Fields[0][0 : 16], 2) & int("1111111000000000", 2)) == int("0000000000000000", 2)) or ((int(Fields[0][0 : 16], 2) & int("1111101000000000", 2)) == int("0000000000000000", 2)):
+    if ((int(Fields[0][8 : 24], 2) & int("1111101000000000", 2)) == int("0000000000000000", 2)):
         Fields[1] = Input_bitstream[pkt_field_size_list[0] : pkt_field_size_list[0] + pkt_field_size_list[1]]
     l = []
     for i in range(num_pkt_fields):
@@ -233,7 +232,7 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                                                                         tran_idx_total_list=tran_idx_total_list,
                                                                         default_idx_node=default_idx_node_list[0], 
                                                                         extract_status=post_extract_status, s=s)
-    for k in range(3):
+    for k in range(1):
         results = []
         for i in range(num_parser_nodes):
             condition = idx == i
@@ -535,7 +534,7 @@ def cegis_loop():
     # Start with one counterexamples  
     cexamples = [[0 for _ in range(num_pkt_fields + 1)]]
     # Set the iteration bound
-    maxIter = 50
+    maxIter = 1000
     for i in range(maxIter):
         print("cexamples =", cexamples, "# cex =", len(cexamples))
         candidate = synthesis_step(cexamples)
@@ -555,7 +554,8 @@ def cegis_loop():
         # Go to verificaiton phase
         cexample = verification_step(model=candidate, cexamples=cexamples)
         if cexample is None:
-            # print("Final output:", p4_in_json)
+            print("model_json =", model_json)
+            print("Final output:", p4_in_json)
             print(f"Valid function found")
             return
         else:
