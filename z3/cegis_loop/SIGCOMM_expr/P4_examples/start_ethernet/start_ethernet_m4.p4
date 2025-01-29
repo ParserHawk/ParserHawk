@@ -49,7 +49,7 @@ parser ParserI(packet_in b,
     }
     state parse_llc_header {
         b.extract(hdr.data);
-        transition select(hdr.data.f16) {
+        transition select(hdr.data.f8) {
             0 : accept;
             1 : accept;
             2 : accept;
