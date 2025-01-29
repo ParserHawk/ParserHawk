@@ -50,7 +50,7 @@ def specification(Input_bitstream, initial_field_val_list):
     #  pos 0   1  2  3 4
     #  idx 13 12 11 10 9 8 
     O_field0 = Extract(input_bit_stream_size - 1, input_bit_stream_size - 1 - pkt_field_size_list[0] + 1, Input_bitstream) #node 0
-    O_field1 = If(And(Extract(15, 12, O_field0) == BitVecVal(0x8, 4), (Extract(11, 8, O_field0) & BitVecVal(0xe, 4)) == BitVecVal(0x0, 4)), initial_field_val_list[1], Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream))
+    O_field1 = If(And(Extract(15, 12, O_field0) == BitVecVal(0x8, 4), (Extract(11, 8, O_field0) & BitVecVal(0xe, 4)) == BitVecVal(0x0, 4)), initial_field_val_list[1], If(Extract(15, 12, O_field0) == BitVecVal(0x8, 4), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream),initial_field_val_list[1]))
     
     return [O_field0, O_field1]
 
@@ -232,7 +232,7 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                                                                         tran_idx_total_list=tran_idx_total_list,
                                                                         default_idx_node=default_idx_node_list[0], 
                                                                         extract_status=post_extract_status, s=s)
-    for k in range(3):
+    for k in range(1):
         results = []
         for i in range(num_parser_nodes):
             condition = idx == i
