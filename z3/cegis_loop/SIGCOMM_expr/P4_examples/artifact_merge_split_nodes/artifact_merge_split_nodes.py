@@ -242,7 +242,7 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                                                                         tran_idx_total_list=tran_idx_total_list,
                                                                         default_idx_node=default_idx_node_list[0], 
                                                                         extract_status=post_extract_status, s=s)
-    for k in range(3):
+    for k in range(1):
         results = []
         for i in range(num_parser_nodes):
             condition = idx == i

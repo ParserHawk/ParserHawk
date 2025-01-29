@@ -5,37 +5,27 @@ import random
 import sys
 import json
 import random
-import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../')))
 # Now you can import the library from Folder B
-from practical_ex.code_gen_big_tcam import *
+from practical_ex.code_gen_IPU import *
 
 """
 spec:
-state start {
-    transition ethernet;
-}
 state ethernet {
     b.extract(hdr.data);
-    transition select(hdr.data.f8) {
-        0: parse_llc_header_pre;
+    transition select(hdr.data.f8, hdr.data.f4) {
+        (0, 0): parse_llc_header;
+        (0, 1): parse_llc_header;
         default: accept;
     }
 }
-state parse_llc_header_pre {
-    transition select(hdr.data.f4) {
-        0: parse_llc_header;
-        1: parse_llc_header;
-        default: accept;
-    }
-}
+
 state parse_llc_header {
     b.extract(hdr.data1);
     transition accept;
 }
 """
-
 
 input_bit_stream_size = 12+1
 
@@ -45,7 +35,9 @@ num_pkt_fields = len(pkt_field_size_list)
 # List the hardware configuration
 lookahead_window_size = 2
 size_of_key = 12
-num_parser_nodes = 2
+
+parser_node_pipe = [1,1]
+num_parser_nodes = sum(parser_node_pipe)
 tcam_num = 1
 
 # TODO: should generate the specification automatically
@@ -57,7 +49,9 @@ def specification(Input_bitstream, initial_field_val_list):
     #  pos 0   1  2  3 4
     #  idx 13 12 11 10 9 8 
     O_field0 = Extract(input_bit_stream_size - 1, input_bit_stream_size - 1 - pkt_field_size_list[0] + 1, Input_bitstream) #node 0
-    O_field1 = If(And((Extract(pkt_field_size_list[0] - 1, pkt_field_size_list[0] - 1 - 7, O_field0) == BitVecVal(0b00000000, 8), Extract(pkt_field_size_list[0] - 1 - 8, pkt_field_size_list[0] - 1 - 8 - 2, O_field0) == BitVecVal(0b000, 3))), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
+    Condition1 = And((Extract(pkt_field_size_list[0] - 1, pkt_field_size_list[0] - 1 -7, O_field0) == BitVecVal(0b00000000, 8), Extract(pkt_field_size_list[0] - 1 - 8, pkt_field_size_list[0] - 1 - 8 - 3, O_field0) == BitVecVal(0b0000, 4)))
+    Condition2 = And((Extract(pkt_field_size_list[0] - 1, pkt_field_size_list[0] - 1 -7, O_field0) == BitVecVal(0b00000000, 8), Extract(pkt_field_size_list[0] - 1 - 8, pkt_field_size_list[0] - 1 - 8 - 3, O_field0) == BitVecVal(0b0001, 4)))
+    O_field1 = If(Or(Condition1, Condition2), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
     
     return [O_field0, O_field1]
 
@@ -68,7 +62,7 @@ def spec(Input_bitstream, initial_list):
     # l = [int(Input_bitstream[0 : 4], 2), int(Input_bitstream[4 : 8], 2)
     Fields = ["" for _ in range(num_pkt_fields)]
     Fields[0] = Input_bitstream[0 : pkt_field_size_list[0]]
-    if ((Fields[0][0 : 8] == "00000000" and Fields[0][8 : 11] == "000")):
+    if (Fields[0][0 : 8] == "00000000" and Fields[0][8 : 12] == "0000") or (Fields[0][0 : 8] == "00000000" and Fields[0][8 : 12] == "0001"):
         Fields[1] = Input_bitstream[pkt_field_size_list[0] : pkt_field_size_list[0] + pkt_field_size_list[1]]
     l = []
     for i in range(num_pkt_fields):
@@ -151,7 +145,7 @@ def generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tr
     # Reverse the order because we want to make the TCAM entry with smaller number to dominate the transition logic
     for i in range(tcam_num - 1, -1, -1):
         # key_val_list = BitVec(name, size_of_key);
-        ret_idx = If(And(assignments[i] == node_id, (Extract(size_of_key - 1, 0, key_sel) & key_mask_total_list[i]) == key_val_total_list[i]), tran_idx_total_list[i], ret_idx)
+        ret_idx = If(And(assignments[i] == node_id, (Extract(size_of_key - 1, 0, key_sel) & key_mask_total_list[i]) == (key_val_total_list[i] & key_mask_total_list[i])), tran_idx_total_list[i], ret_idx)
 
     # Final state transition for idx == 1
     ret_idx = If(idx == node_id, ret_idx, idx)
@@ -163,7 +157,6 @@ def update_extract_states(idx, Dist, extract_status, node_id, num_pkt_fields):
     for i in range(num_pkt_fields):
         ret_l.append(If(And(idx == node_id, Dist[i] == 1), 1, extract_status[i]))
     return ret_l
-
 
 def new_node(nodeID, Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
     key_expr_list = generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix)
@@ -190,9 +183,11 @@ def new_node(nodeID, Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments,
 def temporary_bitvec_for_counterexample(I_val, random_initial_value_list, num_pkt_fields, testcaseID):
     # Dynamically create new BitVec variable for this iteration
     Input_bitstream = BitVec(f'Input_bitstream_{testcaseID}', input_bit_stream_size)  # 8-bit for example, can be adjusted
-    input_field0 = BitVec(f'input_field0_{testcaseID}', pkt_field_size_list[0])
-    input_field1 = BitVec(f'input_field1_{testcaseID}', pkt_field_size_list[1])
-    # input_field2 = BitVec(f'input_field2_{testcaseID}', pkt_field_size_list[2])
+    l=[]
+    for i in range(len(pkt_field_size_list)):
+        field_name = f'input_field{i}_{testcaseID}'
+        input_field = BitVec(field_name, pkt_field_size_list[i])
+        l.append(input_field)
     
     extract_status = []
     for i in range(num_pkt_fields):
@@ -200,13 +195,12 @@ def temporary_bitvec_for_counterexample(I_val, random_initial_value_list, num_pk
     # Define constraints for this temporary BitVec based on the counterexample
     constraint = []
     constraint.append(Input_bitstream == I_val)  # Constraint depends on the counterexample
-    constraint.append(input_field0 == random_initial_value_list[0])
-    constraint.append(input_field1 == random_initial_value_list[1])
-    # constraint.append(input_field2 == random_initial_value_list[2])
+    for i in range(len(random_initial_value_list)):
+        constraint.append(l[i] == random_initial_value_list[i])
+
     for i in range(num_pkt_fields):
         constraint.append(extract_status[i] == 0)
-    # return Input_bitstream, [input_field0, input_field1, input_field2], extract_status, constraint
-    return Input_bitstream, [input_field0, input_field1], extract_status, constraint
+    return Input_bitstream, l, extract_status, constraint
 
 # Implementation, concrete z3 variables' values are decided by the z3 solver
 def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list, 
@@ -221,50 +215,54 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                                                                                                          random_initial_value_list=random_initial_value_list, 
                                                                                                          num_pkt_fields=num_pkt_fields, testcaseID=testcaseID)
     s.add(temp_constraint)
-    
+
+    # Using for loop to replace the iterative accessing the node function
+    # nodes = [] # list of function names
+    # for i in range(num_parser_nodes):
+        # node_function = globals()[f'node{i}']  # Access the function dynamically by its name
+        # nodes.append(node_function)
     Out_Fields = Input_Fields
     post_extract_status=extract_status
     post_pos = pos
-    # always visit node 0 in the beginning
-    Out_Fields, post_pos, idx, post_extract_status = new_node(0, Flags[0], Out_Fields, Input_bitstream, 
+
+    sum_l = []
+    for v in parser_node_pipe:
+        if len(sum_l) == 0:
+            sum_l.append(v)
+        else:
+            sum_l.append(sum_l[-1] + v)
+    for i in range(len(parser_node_pipe)):
+        if i == 0:
+            Out_Fields, post_pos, idx, post_extract_status = new_node(0, Flags[0], Out_Fields, Input_bitstream, 
                                                                         idx=idx, pos=post_pos, alloc_matrix=alloc_matrix, 
                                                                         Lookahead=Lookahead, 
                                                                         # key_val_list=key_val_2D_list[0], 
                                                                         # key_mask_list=key_mask_2D_list[0], 
                                                                         # tran_idx_list=tran_idx_2D_list[0],
-                                                                        assignments=assignments,
-                                                                        key_val_total_list=key_val_total_list, 
-                                                                        key_mask_total_list=key_mask_total_list, 
-                                                                        tran_idx_total_list=tran_idx_total_list,
+                                                                        assignments=assignments[0],
+                                                                        key_val_total_list=key_val_total_list[0], 
+                                                                        key_mask_total_list=key_mask_total_list[0], 
+                                                                        tran_idx_total_list=tran_idx_total_list[0],
                                                                         default_idx_node=default_idx_node_list[0], 
                                                                         extract_status=post_extract_status, s=s)
-    for k in range(1):
-        results = []
-        for i in range(num_parser_nodes):
-            condition = idx == i
-            out_fields, post_pos_i, idx_i, post_extract_status_i = new_node(
-                i, Flags[i], Out_Fields, Input_bitstream, 
-                idx=idx, pos=post_pos, alloc_matrix=alloc_matrix, 
+        else:
+            assign_id = 0
+            curr_sum = 0
+            for j in range(len(parser_node_pipe)):
+                curr_sum += parser_node_pipe[j]
+                if curr_sum > i:
+                    assign_id = j
+                    break
+            Out_Fields, post_pos, idx, post_extract_status = new_node(i, 
+                Flags[i], Out_Fields, Input_bitstream, idx=idx, pos=post_pos, alloc_matrix=alloc_matrix,
                 Lookahead=Lookahead, 
-                # key_val_list=key_val_2D_list[0], 
-                # key_mask_list=key_mask_2D_list[0], 
-                # tran_idx_list=tran_idx_2D_list[0],
-                assignments=assignments,
-                key_val_total_list=key_val_total_list, 
-                key_mask_total_list=key_mask_total_list, 
-                tran_idx_total_list=tran_idx_total_list,
-                default_idx_node=default_idx_node_list[i], 
-                extract_status=post_extract_status, s=s
+                # key_val_list=key_val_2D_list[i], key_mask_list=key_mask_2D_list[i], tran_idx_list=tran_idx_2D_list[i],
+                assignments=assignments[assign_id],
+                key_val_total_list=key_val_total_list[assign_id],
+                key_mask_total_list=key_mask_total_list[assign_id], 
+                tran_idx_total_list=tran_idx_total_list[assign_id],
+                default_idx_node=default_idx_node_list[i], extract_status=post_extract_status, s=s
             )
-            results.append((condition, out_fields, post_pos_i, idx_i, post_extract_status_i))
-
-        # Process the results to update Out_Fields, post_pos, idx, and post_extract_status
-        for condition, out_fields_i, post_pos_i, idx_i, post_extract_status_i in results:
-            Out_Fields = [If(condition, then_ele, else_ele) for then_ele, else_ele in zip(out_fields_i, Out_Fields)]
-            post_pos = If(condition, post_pos_i, post_pos)
-            idx = If(condition, idx_i, idx)
-            post_extract_status = [If(condition, then_ele, else_ele) for then_ele, else_ele in zip(post_extract_status_i, post_extract_status)]
-
     return Out_Fields
 
 # Generate Flag variables
@@ -316,12 +314,48 @@ def lookahead_gen(num_parser_nodes, lookahead_window_size):
         Lookahead.append(node_ahead)  # Append the node lookahead list to Lookahead
     return Lookahead
 
+def assignment_gen(stage_num, tcam_num):
+    assignments = []
+    for i in range(stage_num):
+        assign = []
+        for j in range(tcam_num):
+            assign.append(Int(f'assign_stage_{i}_tcam{j}'))
+        assignments.append(assign)
+    return assignments
+
+def key_val_gen(stage_num, tcam_num):
+    key_val_total_list = []
+    for i in range(stage_num):
+        key_val_l = []
+        for j in range(tcam_num):
+            key_val_l.append(BitVec(f'key_val_stage_{i}_tcam{j}',size_of_key))
+        key_val_total_list.append(key_val_l)
+    return key_val_total_list
+
+def key_mask_gen(stage_num, tcam_num):
+    key_mask_total_list = []
+    for i in range(stage_num):
+        key_mask_l = []
+        for j in range(tcam_num):
+            key_mask_l.append(BitVec(f'key_mask_stage_{i}_tcam{j}',size_of_key))
+        key_mask_total_list.append(key_mask_l)
+    return key_mask_total_list
+
+def tran_id_gen(stage_num, tcam_num):
+    tran_idx_total_list = []
+    for i in range(stage_num):
+        tran_idx_l = []
+        for j in range(tcam_num):
+            tran_idx_l.append(Int(f'tran_idx_stage_{i}_tcam{j}'))
+        tran_idx_total_list.append(tran_idx_l)
+    return tran_idx_total_list
+
 # Generate default transition index in each parser node
 # e.g., default_idx_node0 = Int('default_idx_node0')
 def default_idx_gen(num_parser_nodes):
     default_idx_node_list = []
-    for nodeID in range(num_parser_nodes):
-        default_idx_node_list.append(Int(f'default_idx_node{nodeID}'))
+    for i in range(num_parser_nodes):
+        default_idx_node_list.append(Int(f'default_idx_node_{i}'))
     return default_idx_node_list
 
 def synthesis_step(cexamples):
@@ -347,9 +381,7 @@ def synthesis_step(cexamples):
     for i in range(num_parser_nodes):
         for j in range(num_pkt_fields):
             s.add(Or(Flags[i][j] == 0, Flags[i][j] == 1))
-    s.add(Flags[0][0] == 1)
-    s.add(Flags[1][1] == 1)
-    
+
     idx = Int('idx')
     s.add(idx == 0)
     pos = Int('pos')
@@ -366,13 +398,42 @@ def synthesis_step(cexamples):
     default_idx_node_list = default_idx_gen(num_parser_nodes=num_parser_nodes)
 
     # NEW CODE
-    assignments = [Int(f'assign_{i}') for i in range(tcam_num)]
-    key_val_total_list = [BitVec(f'key_val{i}', size_of_key) for i in range(tcam_num)]
-    key_mask_total_list = [BitVec(f'key_mask{i}', size_of_key) for i in range(tcam_num)]
-    tran_idx_total_list = [Int(f'tran_idx{i}') for i in range(tcam_num)]
-    constraints = [assignments[i] >= 0 for i in range(tcam_num)]
-    for i in range(tcam_num - 1):
-        constraints.append(assignments[i] <= assignments[i + 1])
+    assignments = assignment_gen(stage_num=len(parser_node_pipe), tcam_num=tcam_num)
+    # print("assignments =", assignments)
+    key_val_total_list = key_val_gen(stage_num=len(parser_node_pipe), tcam_num=tcam_num)
+    key_mask_total_list = key_mask_gen(stage_num=len(parser_node_pipe), tcam_num=tcam_num)
+    tran_idx_total_list = tran_id_gen(stage_num=len(parser_node_pipe), tcam_num=tcam_num)
+    # print("key_val_total_list =", key_val_total_list)
+    # print("key_mask_total_list =", key_mask_total_list)
+    # print("tran_idx_total_list =", tran_idx_total_list)
+
+    # TODO: set parser node stage by stage
+    
+    
+    sum_l = []
+    for v in parser_node_pipe:
+        if len(sum_l) == 0:
+            sum_l.append(v)
+        else:
+            sum_l.append(sum_l[-1] + v)
+    # TODO: Add constraints to the state transition idx
+    for i in range(len(parser_node_pipe)):
+        for j in range(tcam_num):
+            s.add(tran_idx_total_list[i][j] >= sum_l[i])
+    # TODO: Add constraints to the default transition idx
+    ID = 0
+    for i in range(len(parser_node_pipe)):
+        for j in range(parser_node_pipe[i]):
+            s.add(default_idx_node_list[ID] >= sum_l[i])
+            ID += 1
+
+    constraints = []
+    for i in range(len(parser_node_pipe)):
+        for j in range(tcam_num):
+            constraints.append(assignments[i][j] >= 0)
+            constraints.append(Or(assignments[i][j] < sum_l[i], assignments[i][j] > num_parser_nodes))
+            if j >= 1:
+                constraints.append(assignments[i][j - 1] <= assignments[i][j])
     s.add(constraints)
 
     if not cexamples:
@@ -440,35 +501,39 @@ def verification_step(model, cexamples):
             else:
                 s.add(Lookahead[i][j] == 0)
     
-    assignments = [Int(f'assign_{i}') for i in range(tcam_num)]
-    key_val_total_list = [BitVec(f'key_val{i}', size_of_key) for i in range(tcam_num)]
-    key_mask_total_list = [BitVec(f'key_mask{i}', size_of_key) for i in range(tcam_num)]
-    tran_idx_total_list = [Int(f'tran_idx{i}') for i in range(tcam_num)]
+    assignments = assignment_gen(stage_num=len(parser_node_pipe), tcam_num=tcam_num)
+    key_val_total_list = key_val_gen(stage_num=len(parser_node_pipe), tcam_num=tcam_num)
+    key_mask_total_list = key_mask_gen(stage_num=len(parser_node_pipe), tcam_num=tcam_num)
+    tran_idx_total_list = tran_id_gen(stage_num=len(parser_node_pipe), tcam_num=tcam_num)
 
     for i in range(len(assignments)):
-        value = model.evaluate(assignments[i], model_completion=True)
-        if value is not None:
-            s.add(assignments[i] == value.as_long())
-        else:
-            s.add(assignments[i] == tcam_num)
+        for j in range(len(assignments[i])):
+            value = model.evaluate(assignments[i][j], model_completion=True)
+            if value is not None:
+                s.add(assignments[i][j] == value.as_long())
+            else:
+                s.add(assignments[i][j] == num_parser_nodes)
     for i in range(len(key_val_total_list)):
-        value = model.evaluate(key_val_total_list[i], model_completion=True)
-        if value is not None:
-            s.add(key_val_total_list[i] == value.as_long())
-        else:
-            s.add(key_val_total_list[i] == -1)
+        for j in range(len(key_val_total_list[i])):
+            value = model.evaluate(key_val_total_list[i][j], model_completion=True)
+            if value is not None:
+                s.add(key_val_total_list[i][j] == value.as_long())
+            else:
+                s.add(key_val_total_list[i][j] == -1)
     for i in range(len(key_mask_total_list)):
-        value = model.evaluate(key_mask_total_list[i], model_completion=True)
-        if value is not None:
-            s.add(key_mask_total_list[i] == value.as_long())
-        else:
-            s.add(key_mask_total_list[i] == -1)
+        for j in range(len(key_mask_total_list[i])):
+            value = model.evaluate(key_mask_total_list[i][j], model_completion=True)
+            if value is not None:
+                s.add(key_mask_total_list[i][j] == value.as_long())
+            else:
+                s.add(key_mask_total_list[i][j] == -1)
     for i in range(len(tran_idx_total_list)):
-        value = model.evaluate(tran_idx_total_list[i], model_completion=True)
-        if value is not None:
-            s.add(tran_idx_total_list[i] == value.as_long())
-        else:
-            s.add(tran_idx_total_list[i] == num_parser_nodes)
+        for j in range(len(tran_idx_total_list[i])):
+            value = model.evaluate(tran_idx_total_list[i][j], model_completion=True)
+            if value is not None:
+                s.add(tran_idx_total_list[i][j] == value.as_long())
+            else:
+                s.add(tran_idx_total_list[i][j] == num_parser_nodes)
 
     # key_val_2D_list, key_mask_2D_list = key_val_gen(num_transitions=num_transitions, size_of_key=size_of_key, 
     #                               num_parser_nodes=num_parser_nodes)
