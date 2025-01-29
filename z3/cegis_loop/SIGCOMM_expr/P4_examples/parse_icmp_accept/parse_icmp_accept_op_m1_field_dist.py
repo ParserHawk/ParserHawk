@@ -39,7 +39,7 @@ num_pkt_fields = len(pkt_field_size_list)
 lookahead_window_size = 2
 size_of_key = 8
 num_parser_nodes = 2
-tcam_num = 3
+tcam_num = 2
 
 # TODO: should generate the specification automatically
 # Input: Input_bitstream with the type bitVec var in z3, and initial value of all fields

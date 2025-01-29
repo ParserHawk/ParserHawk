@@ -39,7 +39,7 @@ num_pkt_fields = len(pkt_field_size_list)
 lookahead_window_size = 2
 size_of_key = 8
 num_parser_nodes = 2
-tcam_num = 3
+tcam_num = 2
 
 # TODO: should generate the specification automatically
 # Input: Input_bitstream with the type bitVec var in z3, and initial value of all fields
@@ -52,7 +52,7 @@ def specification(Input_bitstream, initial_field_val_list):
     O_field0 = Extract(input_bit_stream_size - 1, input_bit_stream_size - 1 - pkt_field_size_list[0] + 1, Input_bitstream) #node 0
     O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0xfe00, 16)) == (BitVecVal(0x8200, 16) & BitVecVal(0xfe00, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
     O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0xfc00, 16)) == (BitVecVal(0x8400, 16) & BitVecVal(0xfc00, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), O_field1)
-    O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0xff00, 16)) == (BitVecVal(0x8800, 16) & BitVecVal(0xff00, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), O_field1)
+    O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0xf800, 16)) == (BitVecVal(0x8800, 16) & BitVecVal(0xf800, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), O_field1)
     
     return [O_field0, O_field1]
 
@@ -63,7 +63,7 @@ def spec(Input_bitstream, initial_list):
     # l = [int(Input_bitstream[0 : 4], 2), int(Input_bitstream[4 : 8], 2)
     Fields = ["" for _ in range(num_pkt_fields)]
     Fields[0] = Input_bitstream[0 : pkt_field_size_list[0]]
-    if ((int(Fields[0][0 : 16], 2) & int("1111111000000000", 2)) == int("1000001000000000", 2) & int("1111111000000000", 2)) or ((int(Fields[0][0 : 16], 2) & int("1111110000000000", 2)) == int("1000010000000000", 2) & int("1111110000000000", 2)) or ((int(Fields[0][0 : 16], 2) & int("1111111100000000", 2)) == int("1000100000000000", 2) & int("1111111100000000", 2)):
+    if ((int(Fields[0][0 : 16], 2) & int("1111111000000000", 2)) == int("1000001000000000", 2) & int("1111111000000000", 2)) or ((int(Fields[0][0 : 16], 2) & int("1111110000000000", 2)) == int("1000010000000000", 2) & int("1111110000000000", 2)) or ((int(Fields[0][0 : 16], 2) & int("1111100000000000", 2)) == int("1000100000000000", 2) & int("1111100000000000", 2)):
         Fields[1] = Input_bitstream[pkt_field_size_list[0] : pkt_field_size_list[0] + pkt_field_size_list[1]]
 
     l = []

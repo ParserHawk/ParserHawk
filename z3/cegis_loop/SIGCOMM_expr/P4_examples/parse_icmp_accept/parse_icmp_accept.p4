@@ -42,7 +42,7 @@ parser ParserI(packet_in b,
         transition select(hdr.icmp.typeCode) {
             16w0x8200 &&& 16w0xfe00: parse_set_prio_med;
             16w0x8400 &&& 16w0xfc00: parse_set_prio_med;
-            16w0x8800 &&& 16w0xff00: parse_set_prio_med;
+            16w0x8800 &&& 16w0xf800: parse_set_prio_med;
             default: accept;
         }
     }
