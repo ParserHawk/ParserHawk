@@ -53,9 +53,9 @@ def specification(Input_bitstream, initial_field_val_list):
     #  pos 0   1  2  3 4
     #  idx 13 12 11 10 9 8 
     O_field0 = Extract(input_bit_stream_size - 1, input_bit_stream_size - 1 - pkt_field_size_list[0] + 1, Input_bitstream) #node 0
-    O_field1 = If((Extract(32, 0, O_field0) == BitVecVal(0x00000000, 33)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
-    O_field1 = If((Extract(32, 0, O_field0) == BitVecVal(0x00000001, 33)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), O_field1)
-    
+    Update_V = Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream)
+    O_field1 = If(Or(Extract(32, 0, O_field0) == BitVecVal(0x0, 33), Extract(32, 0, O_field0) == BitVecVal(0x1, 33)), Update_V, initial_field_val_list[1])
+
     return [O_field0, O_field1]
 
 # TODO: should generate the spec automatically
@@ -148,7 +148,7 @@ def generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tr
     # Reverse the order because we want to make the TCAM entry with smaller number to dominate the transition logic
     for i in range(tcam_num - 1, -1, -1):
         # key_val_list = BitVec(name, size_of_key);
-        ret_idx = If(And(assignments[i] == node_id, (Extract(size_of_key - 1, 0, key_sel) & key_mask_total_list[i]) == key_val_total_list[i]), tran_idx_total_list[i], ret_idx)
+        ret_idx = If(And(assignments[i] == node_id, (Extract(size_of_key - 1, 0, key_sel) & key_mask_total_list[i]) == key_val_total_list[i] & key_mask_total_list[i]), tran_idx_total_list[i], ret_idx)
 
     # Final state transition for idx == 1
     ret_idx = If(idx == node_id, ret_idx, idx)
@@ -361,8 +361,8 @@ def synthesis_step(cexamples):
     for i in range(tcam_num - 1):
         constraints.append(assignments[i] <= assignments[i + 1])
     for i in range(tcam_num):
-        constraints.append(Or(key_val_total_list[i] == 0, key_val_total_list[i] == 1))
-        # constraints.append(key_mask_total_list[i] == 0xFFFFFFFF)
+        s.add(Or(key_val_total_list[i] == 0, key_val_total_list[i] == 1))
+        s.add(key_mask_total_list[i] == 0xFFFFFFFF)
     s.add(constraints)
     s.add(Flags[0][0] == 1)
     s.add(Flags[1][1] == 1)
@@ -419,11 +419,11 @@ def verification_step(model, cexamples):
                 s.add(Flags[i][j] == 0)
     for i in range(len(alloc_matrix)):
         for j in range(len(alloc_matrix[i])):
-            value = model.evaluate(alloc_matrix[i][j], model_completion=True)
-            if value is not None:
-                s.add(alloc_matrix[i][j] == value.as_long())
+            if alloc_matrix[i][j].decl() in [d for d in model.decls()]:
+                value = model.evaluate(alloc_matrix[i][j], model_completion=False).as_long()
             else:
-                s.add(alloc_matrix[i][j] == -1)
+                value = -1  # your chosen default
+            s.add(alloc_matrix[i][j] == value)
     for i in range(len(Lookahead)):
         for j in range(len(Lookahead[i])):
             value = model.evaluate(Lookahead[i][j], model_completion=True)
@@ -454,7 +454,7 @@ def verification_step(model, cexamples):
         if value is not None:
             s.add(key_mask_total_list[i] == value.as_long())
         else:
-            s.add(key_mask_total_list[i] == -1)
+            s.add(key_mask_total_list[i] == 0)
     for i in range(len(tran_idx_total_list)):
         value = model.evaluate(tran_idx_total_list[i], model_completion=True)
         if value is not None:
@@ -550,9 +550,9 @@ def cegis_loop():
         model_dict = {}
         for d in candidate:
             model_dict[d.name()] = candidate[d].as_long()  # Convert Z3 values to Python values
-
         # Convert the dictionary to JSON
         model_json = json.dumps(model_dict)
+        print("model_json =", model_json)
         p4_in_json = codegen(model_json, number_of_parser_nodes=num_parser_nodes, size_of_key=size_of_key)
         
         # Go to verificaiton phase
