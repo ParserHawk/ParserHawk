@@ -37,6 +37,7 @@ search_space_bit = 0
 input_bit_stream_size = 33+1
 
 pkt_field_size_list = [33, 1]
+key_field_list = [33, 0]
 num_pkt_fields = len(pkt_field_size_list)
 
 # List the hardware configuration
@@ -97,13 +98,13 @@ def dynamic_extract_loop(s, pos, I, Dist, F, field_size, field_id):
 
 def generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix):
     ret_l = []
-    for i in range(len(alloc_matrix)):
-        ret_l.append(dynamic_extract_loop(s, pos, I, Dist, F[i], len(alloc_matrix[i]), field_id=i))
+    for i in range(len(pkt_field_size_list)):
+        ret_l.append(dynamic_extract_loop(s, pos, I, Dist, F[i], pkt_field_size_list[i], field_id=i))
     return ret_l
 
 def generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id):
     ret_l = []
-    for i in range(len(alloc_matrix)):
+    for i in range(len(pkt_field_size_list)):
         # s.add(Implies(Dist[i] == 1, key_expr_list[i] != None))
         ret_l.append(If(And(idx == node_id, Dist[i] == 1), key_expr_list[i], F[i]))
     return ret_l
@@ -138,7 +139,7 @@ def post_node_pos(idx, Dist, node_id, alloc_matrix, pos):
     
     # Loop over the indices and build the nested If conditions
     for i in range(len(Dist) - 1, -1, -1):  # Reverse order to build nested If from the inside out
-        result = If(Dist[i] == 1, pos + len(alloc_matrix[i]), result)
+        result = If(Dist[i] == 1, pos + pkt_field_size_list[i], result)
     
     # Add the outermost condition for idx
     return If(idx == node_id, result, pos)
@@ -285,12 +286,12 @@ def flag_gen(num_parser_nodes, num_pkt_fields):
 # alloc_matrix = [[field0_0, field0_1, field0_2, field0_3, field0_4, field0_5, field0_6, field0_7], 
 #                 [field1_0, field1_1, field1_2, field1_3], 
 #                 [field2_0, field2_1, field2_2, field2_3, field2_4, field2_5]]
-def alloc_matrix_gen(pkt_field_size_list):
+def alloc_matrix_gen(key_field_list):
     alloc_matrix = []
     # Loop to define the variables and populate the matrix
-    for i in range(len(pkt_field_size_list)):  
+    for i in range(len(key_field_list)):  
         row = []  
-        for j in range(pkt_field_size_list[i]):
+        for j in range(key_field_list[i]):
             # Create a variable with a name 'field{i}_{j}' and append it to the row
             row.append(Int(f'field{i}_{j}'))
         alloc_matrix.append(row)
@@ -345,7 +346,7 @@ def synthesis_step(cexamples):
     pos = Int('pos')
     s.add(pos == 0)
 
-    alloc_matrix = alloc_matrix_gen(pkt_field_size_list=pkt_field_size_list)
+    alloc_matrix = alloc_matrix_gen(key_field_list=key_field_list)
     
     Lookahead = lookahead_gen(num_parser_nodes=num_parser_nodes, lookahead_window_size=lookahead_window_size)
         
@@ -427,7 +428,7 @@ def verification_step(model, cexamples):
     s = Solver()
 
     Flags = flag_gen(num_parser_nodes=num_parser_nodes, num_pkt_fields=num_pkt_fields)    
-    alloc_matrix = alloc_matrix_gen(pkt_field_size_list=pkt_field_size_list)
+    alloc_matrix = alloc_matrix_gen(key_field_list=key_field_list)
     Lookahead = lookahead_gen(num_parser_nodes=num_parser_nodes, lookahead_window_size=lookahead_window_size)
     # Force z3's variables to be the value output from the synthesis phase
     for i in range(len(Flags)):
