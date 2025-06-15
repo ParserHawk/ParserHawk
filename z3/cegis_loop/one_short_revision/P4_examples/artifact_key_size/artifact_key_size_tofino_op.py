@@ -31,6 +31,7 @@ state parse_llc_header {
 synthesis_time = 0
 verification_time = 0
 total_iterations = 0
+has_run = False  # global guard
 search_space_bit = 0
 
 input_bit_stream_size = 33+1
@@ -315,6 +316,8 @@ def default_idx_gen(num_parser_nodes):
 
 def synthesis_step(cexamples):
     print("Enter synthsis phase")
+    global has_run
+    global search_space_bit
     # Define all variables
     s = Solver()
     s.reset()
@@ -345,7 +348,7 @@ def synthesis_step(cexamples):
     alloc_matrix = alloc_matrix_gen(pkt_field_size_list=pkt_field_size_list)
     
     Lookahead = lookahead_gen(num_parser_nodes=num_parser_nodes, lookahead_window_size=lookahead_window_size)
-    
+        
     # key_val_2D_list, key_mask_2D_list = key_val_gen(num_transitions=num_transitions, size_of_key=size_of_key, 
     #                               num_parser_nodes=num_parser_nodes)
     # tran_idx_2D_list = tran_idx_gen(num_transitions=num_transitions,num_parser_nodes=num_parser_nodes)
@@ -355,8 +358,25 @@ def synthesis_step(cexamples):
     # NEW CODE
     assignments = [Int(f'assign_{i}') for i in range(tcam_num)]
     key_val_total_list = [BitVec(f'key_val{i}', size_of_key) for i in range(tcam_num)]
+    
     key_mask_total_list = [BitVec(f'key_mask{i}', size_of_key) for i in range(tcam_num)]
+    
     tran_idx_total_list = [Int(f'tran_idx{i}') for i in range(tcam_num)]
+    # Update search space
+    if not has_run:
+        for i in range(len(Flags)): # Flags
+            search_space_bit += len(Flags[i])
+        for i in range(len(alloc_matrix)): # alloc_matric
+            search_space_bit += len(alloc_matrix[i]) * math.ceil(math.log2(num_parser_nodes + 1))
+        for i in range(len(Lookahead)): # Lookahead
+            search_space_bit += len(Lookahead[i]) * math.ceil(math.log2(num_parser_nodes + 1))
+        search_space_bit += num_parser_nodes * math.ceil(math.log2(num_parser_nodes + 1)) # default transition
+        search_space_bit += tcam_num * math.ceil(math.log2(num_parser_nodes + 1)) # Assignment
+        search_space_bit += tcam_num * size_of_key # Value
+        search_space_bit += tcam_num * size_of_key # Mask
+        search_space_bit += tcam_num * math.ceil(math.log2(num_parser_nodes + 1)) # Transition
+        has_run = True
+
     constraints = [And(assignments[i] >= 0, assignments[i] <= num_parser_nodes) for i in range(tcam_num)]
     for i in range(tcam_num - 1):
         constraints.append(assignments[i] <= assignments[i + 1])
@@ -412,11 +432,11 @@ def verification_step(model, cexamples):
     # Force z3's variables to be the value output from the synthesis phase
     for i in range(len(Flags)):
         for j in range(len(Flags[i])):
-            value = model.evaluate(Flags[i][j], model_completion=True)
-            if value is not None:
-                s.add(Flags[i][j] == value.as_long())
+            if Flags[i][j].decl() in [d for d in model.decls()]:
+                value = model.evaluate(Flags[i][j], model_completion=False).as_long()
             else:
-                s.add(Flags[i][j] == 0)
+                value = 0  # your chosen default
+            s.add(Flags[i][j] == value)
     for i in range(len(alloc_matrix)):
         for j in range(len(alloc_matrix[i])):
             if alloc_matrix[i][j].decl() in [d for d in model.decls()]:
@@ -426,11 +446,11 @@ def verification_step(model, cexamples):
             s.add(alloc_matrix[i][j] == value)
     for i in range(len(Lookahead)):
         for j in range(len(Lookahead[i])):
-            value = model.evaluate(Lookahead[i][j], model_completion=True)
-            if value is not None:
-                s.add(Lookahead[i][j] == value.as_long())
+            if Lookahead[i][j].decl() in [d for d in model.decls()]:
+                value = model.evaluate(Lookahead[i][j], model_completion=False).as_long()
             else:
-                s.add(Lookahead[i][j] == 0)
+                value = 0  # your chosen default
+            s.add(Lookahead[i][j] == value)
     
     assignments = [Int(f'assign_{i}') for i in range(tcam_num)]
     key_val_total_list = [BitVec(f'key_val{i}', size_of_key) for i in range(tcam_num)]
@@ -438,29 +458,32 @@ def verification_step(model, cexamples):
     tran_idx_total_list = [Int(f'tran_idx{i}') for i in range(tcam_num)]
 
     for i in range(len(assignments)):
-        value = model.evaluate(assignments[i], model_completion=True)
-        if value is not None:
-            s.add(assignments[i] == value.as_long())
+        if assignments[i].decl() in [d for d in model.decls()]:
+            value = model.evaluate(assignments[i], model_completion=False).as_long()
         else:
-            s.add(assignments[i] == tcam_num)
+            value = tcam_num  # your chosen default
+        s.add(assignments[i] == value)
+
     for i in range(len(key_val_total_list)):
-        value = model.evaluate(key_val_total_list[i], model_completion=True)
-        if value is not None:
-            s.add(key_val_total_list[i] == value.as_long())
+        if key_val_total_list[i].decl() in [d for d in model.decls()]:
+            value = model.evaluate(key_val_total_list[i], model_completion=False).as_long()
         else:
-            s.add(key_val_total_list[i] == -1)
+            value = -1  # your chosen default
+        s.add(key_val_total_list[i] == value)
+        
     for i in range(len(key_mask_total_list)):
-        value = model.evaluate(key_mask_total_list[i], model_completion=True)
-        if value is not None:
-            s.add(key_mask_total_list[i] == value.as_long())
+        if key_mask_total_list[i].decl() in [d for d in model.decls()]:
+            value = model.evaluate(key_mask_total_list[i], model_completion=False).as_long()
         else:
-            s.add(key_mask_total_list[i] == 0)
+            value = 0  # your chosen default
+        s.add(key_mask_total_list[i] == value)
+        
     for i in range(len(tran_idx_total_list)):
-        value = model.evaluate(tran_idx_total_list[i], model_completion=True)
-        if value is not None:
-            s.add(tran_idx_total_list[i] == value.as_long())
+        if tran_idx_total_list[i].decl() in [d for d in model.decls()]:
+            value = model.evaluate(tran_idx_total_list[i], model_completion=False).as_long()
         else:
-            s.add(tran_idx_total_list[i] == num_parser_nodes)
+            value = num_parser_nodes  # your chosen default
+        s.add(tran_idx_total_list[i] == value)
 
     # key_val_2D_list, key_mask_2D_list = key_val_gen(num_transitions=num_transitions, size_of_key=size_of_key, 
     #                               num_parser_nodes=num_parser_nodes)
@@ -489,11 +512,11 @@ def verification_step(model, cexamples):
 
     default_idx_node_list = default_idx_gen(num_parser_nodes=num_parser_nodes)
     for i in range(len(default_idx_node_list)):
-        value = model.evaluate(default_idx_node_list[i], model_completion=True)
-        if value is not None:
-            s.add(default_idx_node_list[i] == value.as_long())
+        if default_idx_node_list[i].decl() in [d for d in model.decls()]:
+            value = model.evaluate(default_idx_node_list[i], model_completion=False).as_long()
         else:
-            s.add(default_idx_node_list[i] == num_parser_nodes + 1)
+            value = num_parser_nodes + 1 # your chosen default
+        s.add(default_idx_node_list[i] == value)
 
     idx = Int('idx')
     s.add(idx == 0)
@@ -552,7 +575,6 @@ def cegis_loop():
             model_dict[d.name()] = candidate[d].as_long()  # Convert Z3 values to Python values
         # Convert the dictionary to JSON
         model_json = json.dumps(model_dict)
-        print("model_json =", model_json)
         p4_in_json = codegen(model_json, number_of_parser_nodes=num_parser_nodes, size_of_key=size_of_key)
         
         # Go to verificaiton phase
@@ -563,7 +585,7 @@ def cegis_loop():
         if cexample is None:
             print("Final output:", p4_in_json)
             print(f"Valid function found")
-            print(f"Synthesis time: {synthesis_time:.2f}s, Verification time: {verification_time:.2f}s, total_iterations = {i+1}")
+            print(f"Synthesis time: {synthesis_time:.2f}s, Verification time: {verification_time:.2f}s, total_iterations = {i+1}, search_space_bit = {search_space_bit}")
             return
         else:
             print(f"Counterexample found: x = {cexample}")
