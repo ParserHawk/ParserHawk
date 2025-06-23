@@ -102,6 +102,7 @@ def generate_impl(node_list):
 
 # generate a p4 program from z3's output in a json file
 def codegen(json_obj, number_of_parser_nodes, size_of_key):
+    print("From codegen function")
     node_list = []
     # print(json_obj)
     for i in range(number_of_parser_nodes):
