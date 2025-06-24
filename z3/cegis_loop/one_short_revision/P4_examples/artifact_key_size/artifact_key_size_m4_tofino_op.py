@@ -380,9 +380,12 @@ def synthesis_step(cexamples):
     constraints = [And(assignments[i] >= 0, assignments[i] <= num_parser_nodes) for i in range(tcam_num)]
     for i in range(tcam_num - 1):
         constraints.append(assignments[i] <= assignments[i + 1])
+    for i in range(len(alloc_matrix)):
+        for j in range(1, len(alloc_matrix[i]) - 1):
+            s.add(alloc_matrix[i][j] == alloc_matrix[i][j + 1])
     for i in range(tcam_num):
-        s.add(Or(key_val_total_list[i] == 0, key_val_total_list[i] == 1))
         s.add(key_mask_total_list[i] == 0xFFFFFFFF)
+        s.add(Or(key_val_total_list[i] == 0, key_val_total_list[i] == 1))
     s.add(constraints)
     s.add(Flags[0][0] == 1)
     s.add(Flags[1][1] == 1)
