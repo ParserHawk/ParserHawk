@@ -7,6 +7,8 @@ import json
 import random
 import os
 
+import time
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../')))
 # Now you can import the library from Folder B
 from practical_ex.code_gen_big_tcam import *
@@ -29,6 +31,11 @@ state parse_set_prio_med {
 }
 """
 
+synthesis_time = 0
+verification_time = 0
+total_iterations = 0
+has_run = False  # global guard
+search_space_bit = 0
 
 input_bit_stream_size = 16+1
 
@@ -36,8 +43,8 @@ pkt_field_size_list = [16, 1]
 num_pkt_fields = len(pkt_field_size_list)
 
 # List the hardware configuration
-lookahead_window_size = 2
-size_of_key = 8
+lookahead_window_size = 0
+size_of_key = 16
 num_parser_nodes = 2
 tcam_num = 2
 
@@ -105,14 +112,10 @@ def generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node
     return ret_l
 
 def generate_tran_key(alloc_matrix, node_id, update_field_val_l, 
-                      post_node_pos, Lookahead, I, extract_status, s):
+                      post_node_pos, Lookahead, I, s):
     dummy = BitVec('dummy', 1)
     s.add(dummy == 0)
     key_sel = None
-    # Only extracted fields can be used as the state transition key
-    for i in range(len(alloc_matrix)):
-        for j in range(len(alloc_matrix[i])):
-            s.add(Implies(alloc_matrix[i][j] == node_id, extract_status[i] == 1))
 
     for i in range(len(alloc_matrix)):
         for j in range(len(alloc_matrix[i]) - 1, -1, -1):
@@ -151,23 +154,14 @@ def generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tr
     ret_idx = If(idx == node_id, ret_idx, idx)
     return ret_idx
 
-def update_extract_states(idx, Dist, extract_status, node_id, num_pkt_fields):
-    ret_l = []
-    # Update the extraction status only if this node does this packet field extraction
-    for i in range(num_pkt_fields):
-        ret_l.append(If(And(idx == node_id, Dist[i] == 1), 1, extract_status[i]))
-    return ret_l
 
-
-def new_node(nodeID, Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
+def new_node(nodeID, Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, s):
     key_expr_list = generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix)
     update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id = nodeID)
     post_pos = post_node_pos(idx = idx, Dist = Dist, node_id = nodeID, alloc_matrix=alloc_matrix, pos = pos)
-    extract_status = update_extract_states(idx = idx, Dist=Dist, extract_status=extract_status, 
-                                                node_id=nodeID, num_pkt_fields=num_pkt_fields)
     key_sel = generate_tran_key(alloc_matrix = alloc_matrix, node_id = nodeID, 
                                 update_field_val_l = update_field_val_l, 
-                                post_node_pos = post_pos, Lookahead=Lookahead, I = I, extract_status=extract_status, s = s)
+                                post_node_pos = post_pos, Lookahead=Lookahead, I = I, s = s)
     
     # State transition
     # key_val_list = key_val_list
@@ -178,7 +172,7 @@ def new_node(nodeID, Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments,
                                   default_idx_node, size_of_key, key_sel,
                                   idx, node_id = nodeID)
     
-    return update_field_val_l, post_pos, ret_idx, extract_status
+    return update_field_val_l, post_pos, ret_idx
 
 # Function to generate temporary BitVec variables for each iteration
 def temporary_bitvec_for_counterexample(I_val, random_initial_value_list, num_pkt_fields, testcaseID):
@@ -188,19 +182,13 @@ def temporary_bitvec_for_counterexample(I_val, random_initial_value_list, num_pk
     input_field1 = BitVec(f'input_field1_{testcaseID}', pkt_field_size_list[1])
     # input_field2 = BitVec(f'input_field2_{testcaseID}', pkt_field_size_list[2])
     
-    extract_status = []
-    for i in range(num_pkt_fields):
-        extract_status.append(Int(f'extract_flag_field{i}_{testcaseID}'))
     # Define constraints for this temporary BitVec based on the counterexample
     constraint = []
     constraint.append(Input_bitstream == I_val)  # Constraint depends on the counterexample
     constraint.append(input_field0 == random_initial_value_list[0])
     constraint.append(input_field1 == random_initial_value_list[1])
     # constraint.append(input_field2 == random_initial_value_list[2])
-    for i in range(num_pkt_fields):
-        constraint.append(extract_status[i] == 0)
-    # return Input_bitstream, [input_field0, input_field1, input_field2], extract_status, constraint
-    return Input_bitstream, [input_field0, input_field1], extract_status, constraint
+    return Input_bitstream, [input_field0, input_field1], constraint
 
 # Implementation, concrete z3 variables' values are decided by the z3 solver
 def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list, 
@@ -211,16 +199,15 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                    default_idx_node_list, testcaseID, 
                    s):
     
-    Input_bitstream, Input_Fields, extract_status, temp_constraint = temporary_bitvec_for_counterexample(I_val=Input_bitstream, 
+    Input_bitstream, Input_Fields, temp_constraint = temporary_bitvec_for_counterexample(I_val=Input_bitstream, 
                                                                                                          random_initial_value_list=random_initial_value_list, 
                                                                                                          num_pkt_fields=num_pkt_fields, testcaseID=testcaseID)
     s.add(temp_constraint)
     
     Out_Fields = Input_Fields
-    post_extract_status=extract_status
     post_pos = pos
     # always visit node 0 in the beginning
-    Out_Fields, post_pos, idx, post_extract_status = new_node(0, Flags[0], Out_Fields, Input_bitstream, 
+    Out_Fields, post_pos, idx = new_node(0, Flags[0], Out_Fields, Input_bitstream, 
                                                                         idx=idx, pos=post_pos, alloc_matrix=alloc_matrix, 
                                                                         Lookahead=Lookahead, 
                                                                         # key_val_list=key_val_2D_list[0], 
@@ -231,12 +218,12 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                                                                         key_mask_total_list=key_mask_total_list, 
                                                                         tran_idx_total_list=tran_idx_total_list,
                                                                         default_idx_node=default_idx_node_list[0], 
-                                                                        extract_status=post_extract_status, s=s)
+                                                                        s=s)
     for k in range(1):
         results = []
         for i in range(num_parser_nodes):
             condition = idx == i
-            out_fields, post_pos_i, idx_i, post_extract_status_i = new_node(
+            out_fields, post_pos_i, idx_i = new_node(
                 i, Flags[i], Out_Fields, Input_bitstream, 
                 idx=idx, pos=post_pos, alloc_matrix=alloc_matrix, 
                 Lookahead=Lookahead, 
@@ -248,16 +235,15 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                 key_mask_total_list=key_mask_total_list, 
                 tran_idx_total_list=tran_idx_total_list,
                 default_idx_node=default_idx_node_list[i], 
-                extract_status=post_extract_status, s=s
+                s=s
             )
-            results.append((condition, out_fields, post_pos_i, idx_i, post_extract_status_i))
+            results.append((condition, out_fields, post_pos_i, idx_i))
 
         # Process the results to update Out_Fields, post_pos, idx, and post_extract_status
-        for condition, out_fields_i, post_pos_i, idx_i, post_extract_status_i in results:
+        for condition, out_fields_i, post_pos_i, idx_i in results:
             Out_Fields = [If(condition, then_ele, else_ele) for then_ele, else_ele in zip(out_fields_i, Out_Fields)]
             post_pos = If(condition, post_pos_i, post_pos)
             idx = If(condition, idx_i, idx)
-            post_extract_status = [If(condition, then_ele, else_ele) for then_ele, else_ele in zip(post_extract_status_i, post_extract_status)]
 
     return Out_Fields
 
@@ -320,6 +306,8 @@ def default_idx_gen(num_parser_nodes):
 
 def synthesis_step(cexamples):
     print("Enter synthsis phase")
+    global has_run
+    global search_space_bit
     # Define all variables
     s = Solver()
     s.reset()
@@ -363,11 +351,29 @@ def synthesis_step(cexamples):
     key_mask_total_list = [BitVec(f'key_mask{i}', size_of_key) for i in range(tcam_num)]
     tran_idx_total_list = [Int(f'tran_idx{i}') for i in range(tcam_num)]
     constraints = [assignments[i] >= 0 for i in range(tcam_num)]
-    for i in range(tcam_num - 1):
-        constraints.append(assignments[i] <= assignments[i + 1])
+    # for i in range(tcam_num - 1):
+    #     constraints.append(assignments[i] <= assignments[i + 1])
     s.add(constraints)
+    for i in range(len(alloc_matrix)):
+        for j in range(len(alloc_matrix[i]) - 1):
+            s.add(alloc_matrix[i][j] == alloc_matrix[i][j + 1])
+    # for i in range(tcam_num):
+    #     s.add(Or(key_val_total_list[i] == 0x8200, key_val_total_list[i] == 0x8400, key_val_total_list[i] == 0x8800))
     s.add(Flags[0][0] == 1)
     s.add(Flags[1][1] == 1)
+    if not has_run:
+        for i in range(len(Flags)): # Flags
+            search_space_bit += len(Flags[i])
+        for i in range(len(alloc_matrix)): # alloc_matric
+            search_space_bit += len(alloc_matrix[i]) * math.ceil(math.log2(num_parser_nodes + 1))
+        for i in range(len(Lookahead)): # Lookahead
+            search_space_bit += len(Lookahead[i]) * math.ceil(math.log2(num_parser_nodes + 1))
+        search_space_bit += num_parser_nodes * math.ceil(math.log2(num_parser_nodes + 1)) # default transition
+        search_space_bit += tcam_num * math.ceil(math.log2(num_parser_nodes + 1)) # Assignment
+        search_space_bit += tcam_num * size_of_key # Value
+        search_space_bit += tcam_num * size_of_key # Mask
+        search_space_bit += tcam_num * math.ceil(math.log2(num_parser_nodes + 1)) # Transition
+        has_run = True
 
     if not cexamples:
         # We force the counterexample set to be non-empty
@@ -414,25 +420,25 @@ def verification_step(model, cexamples):
     # Force z3's variables to be the value output from the synthesis phase
     for i in range(len(Flags)):
         for j in range(len(Flags[i])):
-            value = model.evaluate(Flags[i][j], model_completion=True)
-            if value is not None:
-                s.add(Flags[i][j] == value.as_long())
+            if Flags[i][j].decl() in [d for d in model.decls()]:
+                value = model.evaluate(Flags[i][j], model_completion=False).as_long()
             else:
-                s.add(Flags[i][j] == 0)
+                value = 0  # your chosen default
+            s.add(Flags[i][j] == value)
     for i in range(len(alloc_matrix)):
         for j in range(len(alloc_matrix[i])):
-            value = model.evaluate(alloc_matrix[i][j], model_completion=True)
-            if value is not None:
-                s.add(alloc_matrix[i][j] == value.as_long())
+            if alloc_matrix[i][j].decl() in [d for d in model.decls()]:
+                value = model.evaluate(alloc_matrix[i][j], model_completion=False).as_long()
             else:
-                s.add(alloc_matrix[i][j] == -1)
+                value = -1  # your chosen default
+            s.add(alloc_matrix[i][j] == value)
     for i in range(len(Lookahead)):
         for j in range(len(Lookahead[i])):
-            value = model.evaluate(Lookahead[i][j], model_completion=True)
-            if value is not None:
-                s.add(Lookahead[i][j] == value.as_long())
+            if Lookahead[i][j].decl() in [d for d in model.decls()]:
+                value = model.evaluate(Lookahead[i][j], model_completion=False).as_long()
             else:
-                s.add(Lookahead[i][j] == 0)
+                value = 0  # your chosen default
+            s.add(Lookahead[i][j] == value)
     
     assignments = [Int(f'assign_{i}') for i in range(tcam_num)]
     key_val_total_list = [BitVec(f'key_val{i}', size_of_key) for i in range(tcam_num)]
@@ -440,62 +446,40 @@ def verification_step(model, cexamples):
     tran_idx_total_list = [Int(f'tran_idx{i}') for i in range(tcam_num)]
 
     for i in range(len(assignments)):
-        value = model.evaluate(assignments[i], model_completion=True)
-        if value is not None:
-            s.add(assignments[i] == value.as_long())
+        if assignments[i].decl() in [d for d in model.decls()]:
+            value = model.evaluate(assignments[i], model_completion=False).as_long()
         else:
-            s.add(assignments[i] == tcam_num)
-    for i in range(len(key_val_total_list)):
-        value = model.evaluate(key_val_total_list[i], model_completion=True)
-        if value is not None:
-            s.add(key_val_total_list[i] == value.as_long())
-        else:
-            s.add(key_val_total_list[i] == -1)
-    for i in range(len(key_mask_total_list)):
-        value = model.evaluate(key_mask_total_list[i], model_completion=True)
-        if value is not None:
-            s.add(key_mask_total_list[i] == value.as_long())
-        else:
-            s.add(key_mask_total_list[i] == -1)
-    for i in range(len(tran_idx_total_list)):
-        value = model.evaluate(tran_idx_total_list[i], model_completion=True)
-        if value is not None:
-            s.add(tran_idx_total_list[i] == value.as_long())
-        else:
-            s.add(tran_idx_total_list[i] == num_parser_nodes)
+            value = tcam_num  # your chosen default
+        s.add(assignments[i] == value)
 
-    # key_val_2D_list, key_mask_2D_list = key_val_gen(num_transitions=num_transitions, size_of_key=size_of_key, 
-    #                               num_parser_nodes=num_parser_nodes)
-    # for i in range(len(key_val_2D_list)):
-    #     for j in range(len(key_val_2D_list[i])):
-    #         value = model.evaluate(key_val_2D_list[i][j], model_completion=True)
-    #         if value is not None:
-    #             s.add(key_val_2D_list[i][j] == value.as_long())
-    #         else:
-    #             s.add(key_val_2D_list[i][j] == 0)
-    # for i in range(len(key_mask_2D_list)):
-    #     for j in range(len(key_mask_2D_list[i])):
-    #         value = model.evaluate(key_mask_2D_list[i][j], model_completion=True)
-    #         if value is not None:
-    #             s.add(key_mask_2D_list[i][j] == value.as_long())
-    #         else:
-    #             s.add(key_mask_2D_list[i][j] == 0)
-    # tran_idx_2D_list = tran_idx_gen(num_transitions=num_transitions,num_parser_nodes=num_parser_nodes)
-    # for i in range(len(tran_idx_2D_list)):
-    #     for j in range(len(tran_idx_2D_list[i])):
-    #         value = model.evaluate(tran_idx_2D_list[i][j], model_completion=True)
-    #         if value is not None:
-    #             s.add(tran_idx_2D_list[i][j] == value.as_long())
-    #         else:
-    #             s.add(tran_idx_2D_list[i][j] == num_parser_nodes + 1)
+    for i in range(len(key_val_total_list)):
+        if key_val_total_list[i].decl() in [d for d in model.decls()]:
+            value = model.evaluate(key_val_total_list[i], model_completion=False).as_long()
+        else:
+            value = -1  # your chosen default
+        s.add(key_val_total_list[i] == value)
+        
+    for i in range(len(key_mask_total_list)):
+        if key_mask_total_list[i].decl() in [d for d in model.decls()]:
+            value = model.evaluate(key_mask_total_list[i], model_completion=False).as_long()
+        else:
+            value = 0  # your chosen default
+        s.add(key_mask_total_list[i] == value)
+        
+    for i in range(len(tran_idx_total_list)):
+        if tran_idx_total_list[i].decl() in [d for d in model.decls()]:
+            value = model.evaluate(tran_idx_total_list[i], model_completion=False).as_long()
+        else:
+            value = num_parser_nodes  # your chosen default
+        s.add(tran_idx_total_list[i] == value)
 
     default_idx_node_list = default_idx_gen(num_parser_nodes=num_parser_nodes)
     for i in range(len(default_idx_node_list)):
-        value = model.evaluate(default_idx_node_list[i], model_completion=True)
-        if value is not None:
-            s.add(default_idx_node_list[i] == value.as_long())
+        if default_idx_node_list[i].decl() in [d for d in model.decls()]:
+            value = model.evaluate(default_idx_node_list[i], model_completion=False).as_long()
         else:
-            s.add(default_idx_node_list[i] == num_parser_nodes + 1)
+            value = num_parser_nodes + 1 # your chosen default
+        s.add(default_idx_node_list[i] == value)
 
     idx = Int('idx')
     s.add(idx == 0)
@@ -537,9 +521,13 @@ def cegis_loop():
     cexamples = [[0 for _ in range(num_pkt_fields + 1)]]
     # Set the iteration bound
     maxIter = 1000
+    global synthesis_time, verification_time, total_iterations, search_space_bit
     for i in range(maxIter):
         print("cexamples =", cexamples, "# cex =", len(cexamples))
+        start_time = time.time()
         candidate = synthesis_step(cexamples)
+        end_time = time.time()
+        synthesis_time += end_time - start_time
         if candidate is None:
             print("Synthesis failed, no valid function found.")
             return
@@ -548,16 +536,19 @@ def cegis_loop():
         model_dict = {}
         for d in candidate:
             model_dict[d.name()] = candidate[d].as_long()  # Convert Z3 values to Python values
-
         # Convert the dictionary to JSON
         model_json = json.dumps(model_dict)
         p4_in_json = codegen(model_json, number_of_parser_nodes=num_parser_nodes, size_of_key=size_of_key)
         
         # Go to verificaiton phase
+        start_time = time.time()
         cexample = verification_step(model=candidate, cexamples=cexamples)
+        end_time = time.time()
+        verification_time += end_time - start_time
         if cexample is None:
             print("Final output:", p4_in_json)
             print(f"Valid function found")
+            print(f"Synthesis time: {synthesis_time:.2f}s, Verification time: {verification_time:.2f}s, total_iterations = {i+1}, search_space_bit = {search_space_bit}")
             return
         else:
             print(f"Counterexample found: x = {cexample}")
