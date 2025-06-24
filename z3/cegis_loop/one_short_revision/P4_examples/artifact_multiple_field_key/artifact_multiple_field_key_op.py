@@ -375,6 +375,9 @@ def synthesis_step(cexamples):
     key_val_total_list = [BitVec(f'key_val{i}', size_of_key) for i in range(tcam_num)]
     key_mask_total_list = [BitVec(f'key_mask{i}', size_of_key) for i in range(tcam_num)]
     tran_idx_total_list = [Int(f'tran_idx{i}') for i in range(tcam_num)]
+    for i in range(len(alloc_matrix)):
+        for j in range(1, len(alloc_matrix[i]) - 1):
+            s.add(alloc_matrix[i][j] == alloc_matrix[i][j + 1])
     for i in range(tcam_num):
         s.add(key_mask_total_list[i] == 0xFFFF)
         s.add(key_val_total_list[i] == 0)
