@@ -344,7 +344,8 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
     Out_Fields = Input_Fields
     post_pos = pos
     # always visit node 0 in the beginning
-    Out_Fields, post_pos, idx = new_node(0, Flags[0], Out_Fields, Input_bitstream, 
+    for i in range(num_parser_nodes):
+        Out_Fields, post_pos, idx = new_node(i, Flags[i], Out_Fields, Input_bitstream, 
                                                                         idx=idx, pos=post_pos, alloc_matrix=alloc_matrix, 
                                                                         Lookahead=Lookahead, 
                                                                         # key_val_list=key_val_2D_list[0], 
@@ -354,33 +355,33 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                                                                         key_val_total_list=key_val_total_list, 
                                                                         key_mask_total_list=key_mask_total_list, 
                                                                         tran_idx_total_list=tran_idx_total_list,
-                                                                        default_idx_node=default_idx_node_list[0], 
+                                                                        default_idx_node=default_idx_node_list[i], 
                                                                         s=s)
-    for k in range(time_to_visit_tcam_tbl):
-        results = []
-        for i in range(num_parser_nodes):
-            condition = idx == i
-            out_fields, post_pos_i, idx_i = new_node(
-                i, Flags[i], Out_Fields, Input_bitstream, 
-                idx=idx, pos=post_pos, alloc_matrix=alloc_matrix, 
-                Lookahead=Lookahead, 
-                # key_val_list=key_val_2D_list[0], 
-                # key_mask_list=key_mask_2D_list[0], 
-                # tran_idx_list=tran_idx_2D_list[0],
-                assignments=assignments,
-                key_val_total_list=key_val_total_list, 
-                key_mask_total_list=key_mask_total_list, 
-                tran_idx_total_list=tran_idx_total_list,
-                default_idx_node=default_idx_node_list[i], 
-                s=s
-            )
-            results.append((condition, out_fields, post_pos_i, idx_i))
+    # for k in range(time_to_visit_tcam_tbl):
+    #     results = []
+    #     for i in range(num_parser_nodes):
+    #         condition = idx == i
+    #         out_fields, post_pos_i, idx_i = new_node(
+    #             i, Flags[i], Out_Fields, Input_bitstream, 
+    #             idx=idx, pos=post_pos, alloc_matrix=alloc_matrix, 
+    #             Lookahead=Lookahead, 
+    #             # key_val_list=key_val_2D_list[0], 
+    #             # key_mask_list=key_mask_2D_list[0], 
+    #             # tran_idx_list=tran_idx_2D_list[0],
+    #             assignments=assignments,
+    #             key_val_total_list=key_val_total_list, 
+    #             key_mask_total_list=key_mask_total_list, 
+    #             tran_idx_total_list=tran_idx_total_list,
+    #             default_idx_node=default_idx_node_list[i], 
+    #             s=s
+    #         )
+    #         results.append((condition, out_fields, post_pos_i, idx_i))
 
-        # Process the results to update Out_Fields, post_pos, idx, and post_extract_status
-        for condition, out_fields_i, post_pos_i, idx_i in results:
-            Out_Fields = [If(condition, then_ele, else_ele) for then_ele, else_ele in zip(out_fields_i, Out_Fields)]
-            post_pos = If(condition, post_pos_i, post_pos)
-            idx = If(condition, idx_i, idx)
+    #     # Process the results to update Out_Fields, post_pos, idx, and post_extract_status
+    #     for condition, out_fields_i, post_pos_i, idx_i in results:
+    #         Out_Fields = [If(condition, then_ele, else_ele) for then_ele, else_ele in zip(out_fields_i, Out_Fields)]
+    #         post_pos = If(condition, post_pos_i, post_pos)
+    #         idx = If(condition, idx_i, idx)
 
     return Out_Fields
 
@@ -473,6 +474,10 @@ def synthesis_step(cexamples):
     s.add(pos == 0)
 
     alloc_matrix = alloc_matrix_gen(key_field_list=key_field_list)
+    alloc_idx_list = []
+    for i in range(len(alloc_matrix)):
+        for j in range(len(alloc_matrix[i]) - 1):
+            s.add(alloc_matrix[i][j] == alloc_matrix[i][j + 1])
     
     Lookahead = lookahead_gen(num_parser_nodes=num_parser_nodes, lookahead_window_size=lookahead_window_size)
         
@@ -513,15 +518,15 @@ def synthesis_step(cexamples):
     for i in range(tcam_num - 1):
         constraints.append(assignments[i] <= assignments[i + 1])
     s.add(constraints)
-    s.add(Flags[0][0] == 1)
-    s.add(Flags[1][1] == 1)
-    s.add(Flags[2][2] == 1)
-    s.add(Flags[3][3] == 1)
-    s.add(Flags[4][4] == 1)
-    s.add(Flags[5][5] == 1)
-    s.add(Flags[6][6] == 1)
-    s.add(Flags[7][7] == 1)
-    s.add(Flags[8][8] == 1)
+    # s.add(Flags[0][0] == 1)
+    # s.add(Flags[1][1] == 1)
+    # s.add(Flags[2][2] == 1)
+    # s.add(Flags[3][3] == 1)
+    # s.add(Flags[4][4] == 1)
+    # s.add(Flags[5][5] == 1)
+    # s.add(Flags[6][6] == 1)
+    # s.add(Flags[7][7] == 1)
+    # s.add(Flags[8][8] == 1)
     
     if not cexamples:
         # We force the counterexample set to be non-empty
