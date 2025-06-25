@@ -393,6 +393,16 @@ def synthesis_step(cexamples):
     for i in range(tcam_num - 1):
         constraints.append(assignments[i] <= assignments[i + 1])
     s.add(constraints)
+    for i in range(len(alloc_matrix)):
+        for j in range(1, len(alloc_matrix[i]) - 1):
+            s.add(alloc_matrix[i][j] == alloc_matrix[i][j + 1])
+    for i in range(tcam_num):
+        s.add(key_mask_total_list[i] == 0xFFFF)
+    s.add(Flags[0][0] == 1)
+    s.add(Flags[1][1] == 1)
+    s.add(Flags[2][2] == 1)
+    s.add(Flags[3][3] == 1)
+    s.add(Flags[4][4] == 1)
     # Update search space
     if not has_run:
         for i in range(len(Flags)): # Flags

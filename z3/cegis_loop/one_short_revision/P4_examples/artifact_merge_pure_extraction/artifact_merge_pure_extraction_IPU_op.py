@@ -6,6 +6,8 @@ import sys
 import json
 import random
 
+import time
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../')))
 # Now you can import the library from Folder B
 from practical_ex.code_gen_IPU import *
@@ -46,6 +48,12 @@ state N4 {
     transition accept;    
 }
 """
+
+synthesis_time = 0
+verification_time = 0
+total_iterations = 0
+has_run = False  # global guard
+search_space_bit = 0
 
 input_bit_stream_size = 5
 
@@ -366,7 +374,7 @@ def assignment_gen(stage_num, tcam_num):
     for i in range(stage_num):
         assign = []
         for j in range(tcam_num):
-            assign.append(Int(f'assign_stage_{j}_tcam{i}'))
+            assign.append(Int(f'assign_stage_{i}_tcam{j}'))
         assignments.append(assign)
     return assignments
 
@@ -375,7 +383,7 @@ def key_val_gen(stage_num, tcam_num):
     for i in range(stage_num):
         key_val_l = []
         for j in range(tcam_num):
-            key_val_l.append(BitVec(f'key_val_stage_{j}_tcam{i}',size_of_key))
+            key_val_l.append(BitVec(f'key_val_stage_{i}_tcam{j}',size_of_key))
         key_val_total_list.append(key_val_l)
     return key_val_total_list
 
@@ -384,7 +392,7 @@ def key_mask_gen(stage_num, tcam_num):
     for i in range(stage_num):
         key_mask_l = []
         for j in range(tcam_num):
-            key_mask_l.append(BitVec(f'key_mask_stage_{j}_tcam{i}',size_of_key))
+            key_mask_l.append(BitVec(f'key_mask_stage_{i}_tcam{j}',size_of_key))
         key_mask_total_list.append(key_mask_l)
     return key_mask_total_list
 
@@ -407,6 +415,8 @@ def default_idx_gen(num_parser_nodes):
 
 def synthesis_step(cexamples):
     print("Enter synthsis phase")
+    global has_run
+    global search_space_bit
     # Define all variables
     s = Solver()
     s.reset()
@@ -482,7 +492,25 @@ def synthesis_step(cexamples):
             if j >= 1:
                 constraints.append(assignments[i][j - 1] <= assignments[i][j])
     s.add(constraints)
-
+    for i in range(len(alloc_matrix)):
+        for j in range(len(alloc_matrix[i]) - 1):
+            s.add(alloc_matrix[i][j] == alloc_matrix[i][j + 1])
+    for i in range(1, len(parser_node_pipe)):
+        for j in range(tcam_num):
+            s.add(key_mask_total_list[i][j] == 0xFFFF)
+    if not has_run:
+        for i in range(len(Flags)): # Flags
+            search_space_bit += len(Flags[i])
+        for i in range(len(alloc_matrix)): # alloc_matric
+            search_space_bit += len(alloc_matrix[i]) * math.ceil(math.log2(num_parser_nodes + 1))
+        for i in range(len(Lookahead)): # Lookahead
+            search_space_bit += len(Lookahead[i]) * math.ceil(math.log2(num_parser_nodes + 1))
+        search_space_bit += num_parser_nodes * math.ceil(math.log2(num_parser_nodes + 1)) # default transition
+        search_space_bit += tcam_num * len(parser_node_pipe) * math.ceil(math.log2(num_parser_nodes + 1)) # Assignment
+        search_space_bit += tcam_num * len(parser_node_pipe) * size_of_key # Value
+        search_space_bit += tcam_num * len(parser_node_pipe) * size_of_key # Mask
+        search_space_bit += tcam_num * len(parser_node_pipe) * math.ceil(math.log2(num_parser_nodes + 1)) # Transition
+        has_run = True
     if not cexamples:
         # We force the counterexample set to be non-empty
         print("Counterexample set cannot be empty")
@@ -655,9 +683,13 @@ def cegis_loop():
     cexamples = [[0 for _ in range(num_pkt_fields + 1)]]
     # Set the iteration bound
     maxIter = 1000
+    global synthesis_time, verification_time, total_iterations, search_space_bit
     for i in range(maxIter):
         print("cexamples =", cexamples, "# cex =", len(cexamples))
+        start_time = time.time()
         candidate = synthesis_step(cexamples)
+        end_time = time.time()
+        synthesis_time += end_time - start_time
         if candidate is None:
             print("Synthesis failed, no valid function found.")
             return
@@ -672,10 +704,14 @@ def cegis_loop():
         p4_in_json = codegen(model_json, number_of_parser_nodes=num_parser_nodes, size_of_key=size_of_key)
         
         # Go to verificaiton phase
+        start_time = time.time()
         cexample = verification_step(model=candidate, cexamples=cexamples)
+        end_time = time.time()
+        verification_time += end_time - start_time
         if cexample is None:
             print("Final output:", p4_in_json)
             print(f"Valid function found")
+            print(f"Synthesis time: {synthesis_time:.2f}s, Verification time: {verification_time:.2f}s, total_iterations = {i+1}, search_space_bit = {search_space_bit}")
             return
         else:
             print(f"Counterexample found: x = {cexample}")

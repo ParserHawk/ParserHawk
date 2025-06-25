@@ -134,14 +134,10 @@ def generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node
     return ret_l
 
 def generate_tran_key(alloc_matrix, node_id, update_field_val_l, 
-                      post_node_pos, Lookahead, I, extract_status, s):
+                      post_node_pos, Lookahead, I, s):
     dummy = BitVec('dummy', 1)
     s.add(dummy == 0)
     key_sel = None
-    # Only extracted fields can be used as the state transition key
-    for i in range(len(alloc_matrix)):
-        for j in range(len(alloc_matrix[i])):
-            s.add(Implies(alloc_matrix[i][j] == node_id, extract_status[i] == 1))
 
     for i in range(len(alloc_matrix)):
         for j in range(len(alloc_matrix[i]) - 1, -1, -1):
@@ -180,22 +176,13 @@ def generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tr
     ret_idx = If(idx == node_id, ret_idx, idx)
     return ret_idx
 
-def update_extract_states(idx, Dist, extract_status, node_id, num_pkt_fields):
-    ret_l = []
-    # Update the extraction status only if this node does this packet field extraction
-    for i in range(num_pkt_fields):
-        ret_l.append(If(And(idx == node_id, Dist[i] == 1), 1, extract_status[i]))
-    return ret_l
-
-def new_node(nodeID, Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
+def new_node(nodeID, Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, s):
     key_expr_list = generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix)
     update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id = nodeID)
     post_pos = post_node_pos(idx = idx, Dist = Dist, node_id = nodeID, alloc_matrix=alloc_matrix, pos = pos)
-    extract_status = update_extract_states(idx = idx, Dist=Dist, extract_status=extract_status, 
-                                                node_id=nodeID, num_pkt_fields=num_pkt_fields)
     key_sel = generate_tran_key(alloc_matrix = alloc_matrix, node_id = nodeID, 
                                 update_field_val_l = update_field_val_l, 
-                                post_node_pos = post_pos, Lookahead=Lookahead, I = I, extract_status=extract_status, s = s)
+                                post_node_pos = post_pos, Lookahead=Lookahead, I = I, s = s)
     
     # State transition
     # key_val_list = key_val_list
@@ -206,7 +193,7 @@ def new_node(nodeID, Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments,
                                   default_idx_node, size_of_key, key_sel,
                                   idx, node_id = nodeID)
     
-    return update_field_val_l, post_pos, ret_idx, extract_status
+    return update_field_val_l, post_pos, ret_idx
 
 # Function to generate temporary BitVec variables for each iteration
 def temporary_bitvec_for_counterexample(I_val, random_initial_value_list, num_pkt_fields, testcaseID):
@@ -224,9 +211,6 @@ def temporary_bitvec_for_counterexample(I_val, random_initial_value_list, num_pk
     input_field4 = BitVec(f'input_field4_{testcaseID}', pkt_field_size_list[4])
     l.append(input_field4)
     
-    extract_status = []
-    for i in range(num_pkt_fields):
-        extract_status.append(Int(f'extract_flag_field{i}_{testcaseID}'))
     # Define constraints for this temporary BitVec based on the counterexample
     constraint = []
     constraint.append(Input_bitstream == I_val)  # Constraint depends on the counterexample
@@ -235,9 +219,8 @@ def temporary_bitvec_for_counterexample(I_val, random_initial_value_list, num_pk
     constraint.append(input_field2 == random_initial_value_list[2])
     constraint.append(input_field3 == random_initial_value_list[3])
     constraint.append(input_field4 == random_initial_value_list[4])
-    for i in range(num_pkt_fields):
-        constraint.append(extract_status[i] == 0)
-    return Input_bitstream, l, extract_status, constraint
+   
+    return Input_bitstream, l, constraint
 
 # Implementation, concrete z3 variables' values are decided by the z3 solver
 def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list, 
@@ -248,7 +231,7 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                    default_idx_node_list, testcaseID, 
                    s):
     
-    Input_bitstream, Input_Fields, extract_status, temp_constraint = temporary_bitvec_for_counterexample(I_val=Input_bitstream, 
+    Input_bitstream, Input_Fields, temp_constraint = temporary_bitvec_for_counterexample(I_val=Input_bitstream, 
                                                                                                          random_initial_value_list=random_initial_value_list, 
                                                                                                          num_pkt_fields=num_pkt_fields, testcaseID=testcaseID)
     s.add(temp_constraint)
@@ -259,10 +242,9 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
         # node_function = globals()[f'node{i}']  # Access the function dynamically by its name
         # nodes.append(node_function)
     Out_Fields = Input_Fields
-    post_extract_status=extract_status
     post_pos = pos
 
-    Out_Fields, post_pos, idx, post_extract_status = new_node(0, Flags[0], Out_Fields, Input_bitstream, 
+    Out_Fields, post_pos, idx = new_node(0, Flags[0], Out_Fields, Input_bitstream, 
                                                                         idx=idx, pos=post_pos, alloc_matrix=alloc_matrix, 
                                                                         Lookahead=Lookahead, 
                                                                         # key_val_list=key_val_2D_list[0], 
@@ -273,7 +255,7 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                                                                         key_mask_total_list=key_mask_total_list[0], 
                                                                         tran_idx_total_list=tran_idx_total_list[0],
                                                                         default_idx_node=default_idx_node_list[0], 
-                                                                        extract_status=post_extract_status, s=s)
+                                                                        s=s)
     
     for k in range(5):
         results = []
@@ -288,7 +270,7 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                     break
             
             condition = idx == i
-            out_fields, post_pos_i, idx_i, post_extract_status_i = new_node(i, 
+            out_fields, post_pos_i, idx_i = new_node(i, 
                 Flags[i], Out_Fields, Input_bitstream, idx=idx, pos=post_pos, alloc_matrix=alloc_matrix,
                 Lookahead=Lookahead, 
                 # key_val_list=key_val_2D_list[i], key_mask_list=key_mask_2D_list[i], tran_idx_list=tran_idx_2D_list[i],
@@ -296,16 +278,15 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                 key_val_total_list=key_val_total_list[assign_id],
                 key_mask_total_list=key_mask_total_list[assign_id], 
                 tran_idx_total_list=tran_idx_total_list[assign_id],
-                default_idx_node=default_idx_node_list[i], extract_status=post_extract_status, s=s
+                default_idx_node=default_idx_node_list[i], s=s
             )
-            results.append((condition, out_fields, post_pos_i, idx_i, post_extract_status_i))
+            results.append((condition, out_fields, post_pos_i, idx_i))
 
         # Process the results to update Out_Fields, post_pos, idx, and post_extract_status
-        for condition, out_fields_i, post_pos_i, idx_i, post_extract_status_i in results:
+        for condition, out_fields_i, post_pos_i, idx_i in results:
             Out_Fields = [If(condition, then_ele, else_ele) for then_ele, else_ele in zip(out_fields_i, Out_Fields)]
             post_pos = If(condition, post_pos_i, post_pos)
             idx = If(condition, idx_i, idx)
-            post_extract_status = [If(condition, then_ele, else_ele) for then_ele, else_ele in zip(post_extract_status_i, post_extract_status)]
 
     return Out_Fields
 
@@ -363,7 +344,7 @@ def assignment_gen(stage_num, tcam_num):
     for i in range(stage_num):
         assign = []
         for j in range(tcam_num):
-            assign.append(Int(f'assign_stage_{j}_tcam{i}'))
+            assign.append(Int(f'assign_stage_{i}_tcam{j}'))
         assignments.append(assign)
     return assignments
 
@@ -372,7 +353,7 @@ def key_val_gen(stage_num, tcam_num):
     for i in range(stage_num):
         key_val_l = []
         for j in range(tcam_num):
-            key_val_l.append(BitVec(f'key_val_stage_{j}_tcam{i}',size_of_key))
+            key_val_l.append(BitVec(f'key_val_stage_{i}_tcam{j}',size_of_key))
         key_val_total_list.append(key_val_l)
     return key_val_total_list
 
@@ -381,7 +362,7 @@ def key_mask_gen(stage_num, tcam_num):
     for i in range(stage_num):
         key_mask_l = []
         for j in range(tcam_num):
-            key_mask_l.append(BitVec(f'key_mask_stage_{j}_tcam{i}',size_of_key))
+            key_mask_l.append(BitVec(f'key_mask_stage_{i}_tcam{j}',size_of_key))
         key_mask_total_list.append(key_mask_l)
     return key_mask_total_list
 
@@ -390,7 +371,7 @@ def tran_id_gen(stage_num, tcam_num):
     for i in range(stage_num):
         tran_idx_l = []
         for j in range(tcam_num):
-            tran_idx_l.append(Int(f'tran_idx_stage_{j}_tcam{i}'))
+            tran_idx_l.append(Int(f'tran_idx_stage_{i}_tcam{j}'))
         tran_idx_total_list.append(tran_idx_l)
     return tran_idx_total_list
 
