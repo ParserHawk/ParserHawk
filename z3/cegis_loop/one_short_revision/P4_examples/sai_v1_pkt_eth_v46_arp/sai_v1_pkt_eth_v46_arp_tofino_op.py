@@ -393,6 +393,9 @@ def synthesis_step(cexamples):
     key_mask_total_list = [BitVec(f'key_mask{i}', size_of_key) for i in range(tcam_num)]
     
     tran_idx_total_list = [Int(f'tran_idx{i}') for i in range(tcam_num)]
+    for i in range(len(alloc_matrix)):
+        for j in range(len(alloc_matrix[i]) - 1):
+            s.add(alloc_matrix[i][j] == alloc_matrix[i][j + 1])
     for i in range(tcam_num):
         s.add(key_mask_total_list[i] == 0xFFFF)
         s.add(Or(key_val_total_list[i] == 0x0800, key_val_total_list[i] == 0x86dd, key_val_total_list[i] == 0x0806))
@@ -518,31 +521,6 @@ def verification_step(model, cexamples):
         else:
             value = num_parser_nodes  # your chosen default
         s.add(tran_idx_total_list[i] == value)
-
-    # key_val_2D_list, key_mask_2D_list = key_val_gen(num_transitions=num_transitions, size_of_key=size_of_key, 
-    #                               num_parser_nodes=num_parser_nodes)
-    # for i in range(len(key_val_2D_list)):
-    #     for j in range(len(key_val_2D_list[i])):
-    #         value = model.evaluate(key_val_2D_list[i][j], model_completion=True)
-    #         if value is not None:
-    #             s.add(key_val_2D_list[i][j] == value.as_long())
-    #         else:
-    #             s.add(key_val_2D_list[i][j] == 0)
-    # for i in range(len(key_mask_2D_list)):
-    #     for j in range(len(key_mask_2D_list[i])):
-    #         value = model.evaluate(key_mask_2D_list[i][j], model_completion=True)
-    #         if value is not None:
-    #             s.add(key_mask_2D_list[i][j] == value.as_long())
-    #         else:
-    #             s.add(key_mask_2D_list[i][j] == 0)
-    # tran_idx_2D_list = tran_idx_gen(num_transitions=num_transitions,num_parser_nodes=num_parser_nodes)
-    # for i in range(len(tran_idx_2D_list)):
-    #     for j in range(len(tran_idx_2D_list[i])):
-    #         value = model.evaluate(tran_idx_2D_list[i][j], model_completion=True)
-    #         if value is not None:
-    #             s.add(tran_idx_2D_list[i][j] == value.as_long())
-    #         else:
-    #             s.add(tran_idx_2D_list[i][j] == num_parser_nodes + 1)
 
     default_idx_node_list = default_idx_gen(num_parser_nodes=num_parser_nodes)
     for i in range(len(default_idx_node_list)):
