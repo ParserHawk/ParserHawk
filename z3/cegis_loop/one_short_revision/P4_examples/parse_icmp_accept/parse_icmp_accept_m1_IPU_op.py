@@ -6,6 +6,7 @@ import sys
 import json
 import random
 
+import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../')))
 # Now you can import the library from Folder B
 from practical_ex.code_gen_IPU import *
@@ -37,6 +38,12 @@ state parse_set_prio_med {
 }
 """
 
+synthesis_time = 0
+verification_time = 0
+total_iterations = 0
+has_run = False  # global guard
+search_space_bit = 0
+
 input_bit_stream_size = 16+1
 
 pkt_field_size_list = [16, 1]
@@ -49,7 +56,6 @@ size_of_key = 16
 parser_node_pipe = [1,1]
 num_parser_nodes = sum(parser_node_pipe)
 tcam_num = 3
-
 
 
 # TODO: should generate the specification automatically
@@ -123,9 +129,9 @@ def generate_tran_key(alloc_matrix, node_id, update_field_val_l,
     s.add(dummy == 0)
     key_sel = None
     # Only extracted fields can be used as the state transition key
-    # for i in range(len(alloc_matrix)):
-    #     for j in range(len(alloc_matrix[i])):
-    #         s.add(Implies(alloc_matrix[i][j] == node_id, extract_status[i] == 1))
+    for i in range(len(alloc_matrix)):
+        for j in range(len(alloc_matrix[i])):
+            s.add(Implies(alloc_matrix[i][j] == node_id, extract_status[i] == 1))
 
     for i in range(len(alloc_matrix)):
         for j in range(len(alloc_matrix[i]) - 1, -1, -1):
@@ -192,6 +198,83 @@ def new_node(nodeID, Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments,
                                   idx, node_id = nodeID)
     
     return update_field_val_l, post_pos, ret_idx, extract_status
+# # Behavior of parser node 1
+# # def node1(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_list, tran_idx_list, default_idx_node, extract_status, s):
+# def node1(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
+#     nodeID = 1
+#     # for i in range(num_pkt_fields):
+#     #     s.add(Implies(And(Dist[i] == 1, idx == nodeID), pos + pkt_field_size_list[i] < input_bit_stream_size))
+#     key_expr_list = generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix)
+#     update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id = nodeID)
+#     post_pos = post_node_pos(idx = idx, Dist = Dist, node_id = nodeID, alloc_matrix=alloc_matrix, pos = pos)
+#     extract_status = update_extract_states(idx = idx, Dist=Dist, extract_status=extract_status, 
+#                                                 node_id=nodeID, num_pkt_fields=num_pkt_fields)
+#     key_sel = generate_tran_key(alloc_matrix = alloc_matrix, node_id = nodeID, 
+#                                 update_field_val_l = update_field_val_l, 
+#                                 post_node_pos = post_pos, Lookahead=Lookahead, I = I, extract_status=extract_status, s = s)
+    
+#     # State transition
+#     # key_val_list = key_val_list
+#     # tran_idx_list = tran_idx_list
+#     # default_idx_node = default_idx_node
+#     # Build the state transition logic with a for loop
+#     ret_idx = generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list,  
+#                                   default_idx_node, size_of_key, key_sel,
+#                                   idx, node_id = nodeID)
+    
+#     return update_field_val_l, post_pos, ret_idx, extract_status
+
+# # Behavior of parser node 2
+# # def node2(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_list, tran_idx_list, default_idx_node, extract_status, s):
+# def node2(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
+#     nodeID = 2
+#     # for i in range(num_pkt_fields):
+#     #     s.add(Implies(And(Dist[i] == 1, idx == nodeID), pos + pkt_field_size_list[i] < input_bit_stream_size))
+#     key_expr_list = generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix)
+#     update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id = nodeID)
+#     post_pos = post_node_pos(idx = idx, Dist = Dist, node_id = nodeID, alloc_matrix=alloc_matrix, pos = pos)
+#     extract_status = update_extract_states(idx = idx, Dist=Dist, extract_status=extract_status, 
+#                                                 node_id=nodeID, num_pkt_fields=num_pkt_fields)
+#     key_sel = generate_tran_key(alloc_matrix = alloc_matrix, node_id = nodeID, 
+#                                 update_field_val_l = update_field_val_l, 
+#                                 post_node_pos = post_pos, Lookahead=Lookahead, I = I, extract_status=extract_status, s = s)
+    
+#     # State transition
+#     # key_val_list = key_val_list
+#     # tran_idx_list = tran_idx_list
+#     # default_idx_node = default_idx_node
+#     # Build the state transition logic with a for loop
+#     ret_idx = generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, 
+#                                   default_idx_node, size_of_key, key_sel,
+#                                   idx, node_id = nodeID)
+    
+#     return update_field_val_l, post_pos, ret_idx, extract_status
+
+# # Behavior of parser node 3
+# # def node3(Dist, F, I, idx, pos, alloc_matrix, Lookahead, key_val_list, key_mask_list, tran_idx_list, default_idx_node, extract_status, s):
+# def node3(Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, extract_status, s):
+#     nodeID = 3
+#     # for i in range(num_pkt_fields):
+#     #     s.add(Implies(And(Dist[i] == 1, idx == nodeID), pos + pkt_field_size_list[i] < input_bit_stream_size))
+#     key_expr_list = generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix)
+#     update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id = nodeID)
+#     post_pos = post_node_pos(idx = idx, Dist = Dist, node_id = nodeID, alloc_matrix=alloc_matrix, pos = pos)
+#     extract_status = update_extract_states(idx = idx, Dist=Dist, extract_status=extract_status, 
+#                                                 node_id=nodeID, num_pkt_fields=num_pkt_fields)
+#     key_sel = generate_tran_key(alloc_matrix = alloc_matrix, node_id = nodeID, 
+#                                 update_field_val_l = update_field_val_l, 
+#                                 post_node_pos = post_pos, Lookahead=Lookahead, I = I, extract_status=extract_status, s = s)
+    
+#     # State transition
+#     # key_val_list = key_val_list
+#     # tran_idx_list = tran_idx_list
+#     # default_idx_node = default_idx_node
+#     # Build the state transition logic with a for loop
+#     ret_idx = generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, 
+#                                   default_idx_node, size_of_key, key_sel,
+#                                   idx, node_id = nodeID)
+    
+#     return update_field_val_l, post_pos, ret_idx, extract_status
 
 # Function to generate temporary BitVec variables for each iteration
 def temporary_bitvec_for_counterexample(I_val, random_initial_value_list, num_pkt_fields, testcaseID):
@@ -202,6 +285,7 @@ def temporary_bitvec_for_counterexample(I_val, random_initial_value_list, num_pk
     l.append(input_field0)
     input_field1 = BitVec(f'input_field1_{testcaseID}', pkt_field_size_list[1])
     l.append(input_field1)
+    # input_field2 = BitVec(f'input_field2_{testcaseID}', pkt_field_size_list[2])
     
     extract_status = []
     for i in range(num_pkt_fields):
@@ -211,6 +295,7 @@ def temporary_bitvec_for_counterexample(I_val, random_initial_value_list, num_pk
     constraint.append(Input_bitstream == I_val)  # Constraint depends on the counterexample
     constraint.append(input_field0 == random_initial_value_list[0])
     constraint.append(input_field1 == random_initial_value_list[1])
+    # constraint.append(input_field2 == random_initial_value_list[2])
     for i in range(num_pkt_fields):
         constraint.append(extract_status[i] == 0)
     return Input_bitstream, l, extract_status, constraint
@@ -373,6 +458,8 @@ def default_idx_gen(num_parser_nodes):
 
 def synthesis_step(cexamples):
     print("Enter synthsis phase")
+    global has_run
+    global search_space_bit
     # Define all variables
     s = Solver()
     s.reset()
@@ -449,6 +536,26 @@ def synthesis_step(cexamples):
                 constraints.append(assignments[i][j - 1] <= assignments[i][j])
     s.add(constraints)
 
+    for i in range(len(alloc_matrix)):
+        for j in range(len(alloc_matrix[i]) - 1):
+            s.add(alloc_matrix[i][j] == alloc_matrix[i][j + 1])
+    for i in range(len(parser_node_pipe)):
+        for j in range(tcam_num):
+            s.add(Or(key_val_total_list[i][j] == 0x8200, key_val_total_list[i][j] == 0x8400, key_val_total_list[i][j] == 0x8800))
+
+    if not has_run:
+        for i in range(len(Flags)): # Flags
+            search_space_bit += len(Flags[i])
+        for i in range(len(alloc_matrix)): # alloc_matric
+            search_space_bit += len(alloc_matrix[i]) * math.ceil(math.log2(num_parser_nodes + 1))
+        for i in range(len(Lookahead)): # Lookahead
+            search_space_bit += len(Lookahead[i]) * math.ceil(math.log2(num_parser_nodes + 1))
+        search_space_bit += num_parser_nodes * math.ceil(math.log2(num_parser_nodes + 1)) # default transition
+        search_space_bit += tcam_num * len(parser_node_pipe) * math.ceil(math.log2(num_parser_nodes + 1)) # Assignment
+        search_space_bit += tcam_num * len(parser_node_pipe) * size_of_key # Value
+        search_space_bit += tcam_num * len(parser_node_pipe) * size_of_key # Mask
+        search_space_bit += tcam_num * len(parser_node_pipe) * math.ceil(math.log2(num_parser_nodes + 1)) # Transition
+        has_run = True
     if not cexamples:
         # We force the counterexample set to be non-empty
         print("Counterexample set cannot be empty")
@@ -548,6 +655,31 @@ def verification_step(model, cexamples):
             else:
                 s.add(tran_idx_total_list[i][j] == num_parser_nodes)
 
+    # key_val_2D_list, key_mask_2D_list = key_val_gen(num_transitions=num_transitions, size_of_key=size_of_key, 
+    #                               num_parser_nodes=num_parser_nodes)
+    # for i in range(len(key_val_2D_list)):
+    #     for j in range(len(key_val_2D_list[i])):
+    #         value = model.evaluate(key_val_2D_list[i][j], model_completion=True)
+    #         if value is not None:
+    #             s.add(key_val_2D_list[i][j] == value.as_long())
+    #         else:
+    #             s.add(key_val_2D_list[i][j] == 0)
+    # for i in range(len(key_mask_2D_list)):
+    #     for j in range(len(key_mask_2D_list[i])):
+    #         value = model.evaluate(key_mask_2D_list[i][j], model_completion=True)
+    #         if value is not None:
+    #             s.add(key_mask_2D_list[i][j] == value.as_long())
+    #         else:
+    #             s.add(key_mask_2D_list[i][j] == 0)
+    # tran_idx_2D_list = tran_idx_gen(num_transitions=num_transitions,num_parser_nodes=num_parser_nodes)
+    # for i in range(len(tran_idx_2D_list)):
+    #     for j in range(len(tran_idx_2D_list[i])):
+    #         value = model.evaluate(tran_idx_2D_list[i][j], model_completion=True)
+    #         if value is not None:
+    #             s.add(tran_idx_2D_list[i][j] == value.as_long())
+    #         else:
+    #             s.add(tran_idx_2D_list[i][j] == num_parser_nodes + 1)
+
     default_idx_node_list = default_idx_gen(num_parser_nodes=num_parser_nodes)
     for i in range(len(default_idx_node_list)):
         value = model.evaluate(default_idx_node_list[i], model_completion=True)
@@ -596,9 +728,13 @@ def cegis_loop():
     cexamples = [[0 for _ in range(num_pkt_fields + 1)]]
     # Set the iteration bound
     maxIter = 1000
+    global synthesis_time, verification_time, total_iterations, search_space_bit
     for i in range(maxIter):
         print("cexamples =", cexamples, "# cex =", len(cexamples))
+        start_time = time.time()
         candidate = synthesis_step(cexamples)
+        end_time = time.time()
+        synthesis_time += end_time - start_time
         if candidate is None:
             print("Synthesis failed, no valid function found.")
             return
@@ -613,16 +749,17 @@ def cegis_loop():
         p4_in_json = codegen(model_json, number_of_parser_nodes=num_parser_nodes, size_of_key=size_of_key)
         
         # Go to verificaiton phase
+        start_time = time.time()
         cexample = verification_step(model=candidate, cexamples=cexamples)
+        end_time = time.time()
+        verification_time += end_time - start_time
         if cexample is None:
             print("Final output:", p4_in_json)
             print(f"Valid function found")
+            print(f"Synthesis time: {synthesis_time:.2f}s, Verification time: {verification_time:.2f}s, total_iterations = {i+1}, search_space_bit = {search_space_bit}")
             return
         else:
             print(f"Counterexample found: x = {cexample}")
-            if cexample in cexamples:
-                print("model_json =", model_json)
-                sys.exit(0)
             cexamples.append(cexample)  # Add the counterexample for the next round
             # this is not necessary but I do this for debuging purpose TODO: remove the next line
             cexamples = sorted(cexamples)
