@@ -631,31 +631,6 @@ def verification_step(model, cexamples):
             else:
                 s.add(tran_idx_total_list[i][j] == num_parser_nodes)
 
-    # key_val_2D_list, key_mask_2D_list = key_val_gen(num_transitions=num_transitions, size_of_key=size_of_key, 
-    #                               num_parser_nodes=num_parser_nodes)
-    # for i in range(len(key_val_2D_list)):
-    #     for j in range(len(key_val_2D_list[i])):
-    #         value = model.evaluate(key_val_2D_list[i][j], model_completion=True)
-    #         if value is not None:
-    #             s.add(key_val_2D_list[i][j] == value.as_long())
-    #         else:
-    #             s.add(key_val_2D_list[i][j] == 0)
-    # for i in range(len(key_mask_2D_list)):
-    #     for j in range(len(key_mask_2D_list[i])):
-    #         value = model.evaluate(key_mask_2D_list[i][j], model_completion=True)
-    #         if value is not None:
-    #             s.add(key_mask_2D_list[i][j] == value.as_long())
-    #         else:
-    #             s.add(key_mask_2D_list[i][j] == 0)
-    # tran_idx_2D_list = tran_idx_gen(num_transitions=num_transitions,num_parser_nodes=num_parser_nodes)
-    # for i in range(len(tran_idx_2D_list)):
-    #     for j in range(len(tran_idx_2D_list[i])):
-    #         value = model.evaluate(tran_idx_2D_list[i][j], model_completion=True)
-    #         if value is not None:
-    #             s.add(tran_idx_2D_list[i][j] == value.as_long())
-    #         else:
-    #             s.add(tran_idx_2D_list[i][j] == num_parser_nodes + 1)
-
     default_idx_node_list = default_idx_gen(num_parser_nodes=num_parser_nodes)
     for i in range(len(default_idx_node_list)):
         value = model.evaluate(default_idx_node_list[i], model_completion=True)

@@ -6,6 +6,7 @@ import sys
 import json
 import random
 import os
+import time
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../')))
 # Now you can import the library from Folder B
@@ -13,33 +14,91 @@ from practical_ex.code_gen_big_tcam import *
 
 """
 spec:
-state parse_icmp {
-    b.extract(hdr.icmp);
-    transition select(hdr.icmp.typeCode) {
-        16w0x8200 &&& 16w0xfe00: parse_set_prio_med;
-        16w0x8400 &&& 16w0xfc00: parse_set_prio_med;
-        16w0x8800 &&& 16w0xff00: parse_set_prio_med;
-        default: accept;
+header ethernet_t {
+    bit<48> dst_addr;
+    bit<48> src_addr;
+    bit<16>         ether_type;
+}
+header dash_packet_meta_t {
+    bit<8> packet_source;
+    bit<4> packet_type;
+    bit<4> packet_subtype;
+    bit<16>     length;
+}
+
+header flow_key_t {
+    bit<48> eni_mac;
+    bit<16> vnet_id;
+    bit<128> src_ip;
+    bit<128> dst_ip;
+    bit<16> src_port;
+    bit<16> dst_port;
+    bit<8> ip_proto;
+    bit<7> reserved;
+    bit<1> is_ip_v6;
+}
+
+struct headers {
+    ethernet_t u0_ethernet;
+    dash_packet_meta_t packet_meta;
+    flow_key_t flow_key;
+}
+
+struct metadata { 
+}
+
+// Skip egress
+control BypassEgress(inout ingress_intrinsic_metadata_for_tm_t ig_tm_md) {
+    apply {
     }
 }
 
-state parse_set_prio_med {
-    b.extract(hdr.data);
-    transition accept;
+parser ParserI(packet_in b,
+               out headers hdr,
+               out metadata meta,
+               out ingress_intrinsic_metadata_t ig_intr_md) {
+    state start {
+        packet.extract(hd.u0_ethernet); // 16-bit field0
+        transition select(hd.u0_ethernet.ether_type) {
+            DASH_ETHTYPE:  parse_dash_hdr; // 0x876d
+            default: accept;
+        }
+    }
+
+    state parse_dash_hdr {
+        packet.extract(hd.packet_meta);  // 4-bit field1
+        // FLOW_CREATE: 1, FLOW_UPDATE: 2, FLOW_DELETE: 3
+        if (hd.packet_meta.packet_subtype == dash_packet_subtype_t.FLOW_CREATE
+            || hd.packet_meta.packet_subtype == dash_packet_subtype_t.FLOW_UPDATE
+            || hd.packet_meta.packet_subtype == dash_packet_subtype_t.FLOW_DELETE) {
+            // Flow create/update/delete, extract flow_key
+            packet.extract(hd.flow_key); //1-bit field2
+        }
+
+        transition accept;
+    }
 }
 """
 
+synthesis_time = 0
+verification_time = 0
+total_iterations = 0
+has_run = False  # global guard
+search_space_bit = 0
 
-input_bit_stream_size = 32+16
+input_bit_stream_size = 16+4+1
 
-pkt_field_size_list = [32, 16]
+pkt_field_size_list = [16, 4, 1]
+key_field_list = [16, 4, 0]
 num_pkt_fields = len(pkt_field_size_list)
 
 # List the hardware configuration
-lookahead_window_size = 2
-size_of_key = 8
-num_parser_nodes = 2
-tcam_num = 2
+lookahead_window_size = 0
+size_of_key = 16
+num_parser_nodes = 3
+tcam_num = 3
+
+num_of_tcam_visit = 2
 
 # TODO: should generate the specification automatically
 # Input: Input_bitstream with the type bitVec var in z3, and initial value of all fields
@@ -50,9 +109,15 @@ def specification(Input_bitstream, initial_field_val_list):
     #  pos 0   1  2  3 4
     #  idx 13 12 11 10 9 8 
     O_field0 = Extract(input_bit_stream_size - 1, input_bit_stream_size - 1 - pkt_field_size_list[0] + 1, Input_bitstream) #node 0
-    O_field1 = If(And(Extract(31, 31-3, O_field0) == BitVecVal(0x8, 4), (Extract(31-4, 31-7, O_field0) & BitVecVal(0b1110, 4)) == BitVecVal(0x0, 4)), initial_field_val_list[1], Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream))
-    
-    return [O_field0, O_field1]
+    post_field0_pos = input_bit_stream_size - 1 - pkt_field_size_list[0]
+    Cond_field1 = Extract(15, 0, O_field0) == BitVecVal(0x876d, 16)
+    O_field1 = If(Cond_field1, Extract(post_field0_pos, post_field0_pos - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
+    Cond_field1_to_2 = Or(Extract(pkt_field_size_list[1] - 1, 0, O_field1) == BitVecVal(1, 4), Extract(pkt_field_size_list[1] - 1, 0, O_field1) == BitVecVal(2, 4), Extract(pkt_field_size_list[1] - 1, 0, O_field1) == BitVecVal(3, 4))
+    Cond_field2 = And(Cond_field1, Cond_field1_to_2)
+    post_field1_pos = post_field0_pos - pkt_field_size_list[1]
+    O_field2 = If(Cond_field2, Extract(post_field1_pos, post_field1_pos - pkt_field_size_list[2] + 1, Input_bitstream), initial_field_val_list[2])
+
+    return [O_field0, O_field1, O_field2]
 
 # TODO: should generate the spec automatically
 # Input: Input_bitstream with the type string, and initial value of all fields
@@ -61,8 +126,10 @@ def spec(Input_bitstream, initial_list):
     # l = [int(Input_bitstream[0 : 4], 2), int(Input_bitstream[4 : 8], 2)
     Fields = ["" for _ in range(num_pkt_fields)]
     Fields[0] = Input_bitstream[0 : pkt_field_size_list[0]]
-    if (Fields[0][0 : 4] == "1000") and ((int(Fields[0][4 : 8], 2) & int("1110", 2)) != int("0000", 2)):
+    if int(Fields[0][0 : pkt_field_size_list[0]], 2) == 0x876d:
         Fields[1] = Input_bitstream[pkt_field_size_list[0] : pkt_field_size_list[0] + pkt_field_size_list[1]]
+        if int(Fields[1][0:pkt_field_size_list[1]], 2) == 1 or int(Fields[1][0:pkt_field_size_list[1]], 2) == 2 or int(Fields[1][0:pkt_field_size_list[1]], 2) == 3:
+            Fields[2] = Input_bitstream[pkt_field_size_list[0] + pkt_field_size_list[1] : pkt_field_size_list[0] + pkt_field_size_list[1] + pkt_field_size_list[2]]
     l = []
     for i in range(num_pkt_fields):
         if Fields[i] != "":
@@ -92,13 +159,13 @@ def dynamic_extract_loop(s, pos, I, Dist, F, field_size, field_id):
 
 def generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix):
     ret_l = []
-    for i in range(len(alloc_matrix)):
-        ret_l.append(dynamic_extract_loop(s, pos, I, Dist, F[i], len(alloc_matrix[i]), field_id=i))
+    for i in range(len(pkt_field_size_list)):
+        ret_l.append(dynamic_extract_loop(s, pos, I, Dist, F[i], pkt_field_size_list[i], field_id=i))
     return ret_l
 
 def generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id):
     ret_l = []
-    for i in range(len(alloc_matrix)):
+    for i in range(len(pkt_field_size_list)):
         # s.add(Implies(Dist[i] == 1, key_expr_list[i] != None))
         ret_l.append(If(And(idx == node_id, Dist[i] == 1), key_expr_list[i], F[i]))
     return ret_l
@@ -108,6 +175,7 @@ def generate_tran_key(alloc_matrix, node_id, update_field_val_l,
     dummy = BitVec('dummy', 1)
     s.add(dummy == 0)
     key_sel = None
+    # Only extracted fields can be used as the state transition key
 
     for i in range(len(alloc_matrix)):
         for j in range(len(alloc_matrix[i]) - 1, -1, -1):
@@ -121,6 +189,9 @@ def generate_tran_key(alloc_matrix, node_id, update_field_val_l,
             if input_bit_stream_size - 1 - i - j < 0:
                 break
             key_sel = If(And(Lookahead[node_id][j] == 1, post_node_pos == i), Concat(key_sel, Extract(input_bit_stream_size - 1 - i - j, input_bit_stream_size - 1 - i - j, I)), Concat(dummy, key_sel))
+    total = sum(pkt_field_size_list) + lookahead_window_size
+    for i in range(total, size_of_key):
+        key_sel = Concat(dummy, key_sel)
     return key_sel
 
 def post_node_pos(idx, Dist, node_id, alloc_matrix, pos):
@@ -129,7 +200,7 @@ def post_node_pos(idx, Dist, node_id, alloc_matrix, pos):
     
     # Loop over the indices and build the nested If conditions
     for i in range(len(Dist) - 1, -1, -1):  # Reverse order to build nested If from the inside out
-        result = If(Dist[i] == 1, pos + len(alloc_matrix[i]), result)
+        result = If(Dist[i] == 1, pos + pkt_field_size_list[i], result)
     
     # Add the outermost condition for idx
     return If(idx == node_id, result, pos)
@@ -140,11 +211,18 @@ def generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tr
     # Reverse the order because we want to make the TCAM entry with smaller number to dominate the transition logic
     for i in range(tcam_num - 1, -1, -1):
         # key_val_list = BitVec(name, size_of_key);
-        ret_idx = If(And(assignments[i] == node_id, (Extract(size_of_key - 1, 0, key_sel) & key_mask_total_list[i]) == key_val_total_list[i]), tran_idx_total_list[i], ret_idx)
+        ret_idx = If(And(assignments[i] == node_id, (Extract(size_of_key - 1, 0, key_sel) & key_mask_total_list[i]) == key_val_total_list[i] & key_mask_total_list[i]), tran_idx_total_list[i], ret_idx)
 
     # Final state transition for idx == 1
     ret_idx = If(idx == node_id, ret_idx, idx)
     return ret_idx
+
+def update_extract_states(idx, Dist, node_id, num_pkt_fields):
+    ret_l = []
+    # Update the extraction status only if this node does this packet field extraction
+    for i in range(num_pkt_fields):
+        ret_l.append(If(And(idx == node_id, Dist[i] == 1), 1))
+    return ret_l
 
 
 def new_node(nodeID, Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, s):
@@ -172,16 +250,17 @@ def temporary_bitvec_for_counterexample(I_val, random_initial_value_list, num_pk
     Input_bitstream = BitVec(f'Input_bitstream_{testcaseID}', input_bit_stream_size)  # 8-bit for example, can be adjusted
     input_field0 = BitVec(f'input_field0_{testcaseID}', pkt_field_size_list[0])
     input_field1 = BitVec(f'input_field1_{testcaseID}', pkt_field_size_list[1])
-    # input_field2 = BitVec(f'input_field2_{testcaseID}', pkt_field_size_list[2])
+    input_field2 = BitVec(f'input_field2_{testcaseID}', pkt_field_size_list[2])
     
     # Define constraints for this temporary BitVec based on the counterexample
     constraint = []
     constraint.append(Input_bitstream == I_val)  # Constraint depends on the counterexample
     constraint.append(input_field0 == random_initial_value_list[0])
     constraint.append(input_field1 == random_initial_value_list[1])
-    # constraint.append(input_field2 == random_initial_value_list[2])
+    constraint.append(input_field2 == random_initial_value_list[2])
+
     # return Input_bitstream, [input_field0, input_field1, input_field2], extract_status, constraint
-    return Input_bitstream, [input_field0, input_field1], constraint
+    return Input_bitstream, [input_field0, input_field1, input_field2], constraint
 
 # Implementation, concrete z3 variables' values are decided by the z3 solver
 def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list, 
@@ -212,7 +291,7 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                                                                         tran_idx_total_list=tran_idx_total_list,
                                                                         default_idx_node=default_idx_node_list[0], 
                                                                         s=s)
-    for k in range(1):
+    for k in range(num_of_tcam_visit):
         results = []
         for i in range(num_parser_nodes):
             condition = idx == i
@@ -237,7 +316,7 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
             Out_Fields = [If(condition, then_ele, else_ele) for then_ele, else_ele in zip(out_fields_i, Out_Fields)]
             post_pos = If(condition, post_pos_i, post_pos)
             idx = If(condition, idx_i, idx)
-            
+
     return Out_Fields
 
 # Generate Flag variables
@@ -268,12 +347,12 @@ def flag_gen(num_parser_nodes, num_pkt_fields):
 # alloc_matrix = [[field0_0, field0_1, field0_2, field0_3, field0_4, field0_5, field0_6, field0_7], 
 #                 [field1_0, field1_1, field1_2, field1_3], 
 #                 [field2_0, field2_1, field2_2, field2_3, field2_4, field2_5]]
-def alloc_matrix_gen(pkt_field_size_list):
+def alloc_matrix_gen(key_field_list):
     alloc_matrix = []
     # Loop to define the variables and populate the matrix
-    for i in range(len(pkt_field_size_list)):  
+    for i in range(len(key_field_list)):  
         row = []  
-        for j in range(pkt_field_size_list[i]):
+        for j in range(key_field_list[i]):
             # Create a variable with a name 'field{i}_{j}' and append it to the row
             row.append(Int(f'field{i}_{j}'))
         alloc_matrix.append(row)
@@ -299,6 +378,8 @@ def default_idx_gen(num_parser_nodes):
 
 def synthesis_step(cexamples):
     print("Enter synthsis phase")
+    global has_run
+    global search_space_bit
     # Define all variables
     s = Solver()
     s.reset()
@@ -326,10 +407,10 @@ def synthesis_step(cexamples):
     pos = Int('pos')
     s.add(pos == 0)
 
-    alloc_matrix = alloc_matrix_gen(pkt_field_size_list=pkt_field_size_list)
+    alloc_matrix = alloc_matrix_gen(key_field_list=key_field_list)
     
     Lookahead = lookahead_gen(num_parser_nodes=num_parser_nodes, lookahead_window_size=lookahead_window_size)
-    
+        
     # key_val_2D_list, key_mask_2D_list = key_val_gen(num_transitions=num_transitions, size_of_key=size_of_key, 
     #                               num_parser_nodes=num_parser_nodes)
     # tran_idx_2D_list = tran_idx_gen(num_transitions=num_transitions,num_parser_nodes=num_parser_nodes)
@@ -339,13 +420,40 @@ def synthesis_step(cexamples):
     # NEW CODE
     assignments = [Int(f'assign_{i}') for i in range(tcam_num)]
     key_val_total_list = [BitVec(f'key_val{i}', size_of_key) for i in range(tcam_num)]
+    
     key_mask_total_list = [BitVec(f'key_mask{i}', size_of_key) for i in range(tcam_num)]
+    
     tran_idx_total_list = [Int(f'tran_idx{i}') for i in range(tcam_num)]
-    constraints = [assignments[i] >= 0 for i in range(tcam_num)]
-    for i in range(tcam_num - 1):
-        constraints.append(assignments[i] <= assignments[i + 1])
-    s.add(constraints)
+    for i in range(tcam_num):
+        s.add(Or(key_val_total_list[i] == 0x876d, key_val_total_list[i] == 1, key_val_total_list[i] == 2, key_val_total_list[i] == 3))
+    for i in range(tcam_num - 1):   
+        s.add(Or(key_mask_total_list[i] == 0xffff))
+    for i in range(len(alloc_matrix)):
+        for j in range(len(alloc_matrix[i]) - 1):
+            s.add(alloc_matrix[i][j] == alloc_matrix[i][j + 1])
+    # Update search space
+    if not has_run:
+        for i in range(len(Flags)): # Flags
+            search_space_bit += len(Flags[i])
+        for i in range(len(alloc_matrix)): # alloc_matric
+            search_space_bit += len(alloc_matrix[i]) * math.ceil(math.log2(num_parser_nodes + 1))
+        for i in range(len(Lookahead)): # Lookahead
+            search_space_bit += len(Lookahead[i]) * math.ceil(math.log2(num_parser_nodes + 1))
+        search_space_bit += num_parser_nodes * math.ceil(math.log2(num_parser_nodes + 1)) # default transition
+        search_space_bit += tcam_num * math.ceil(math.log2(num_parser_nodes + 1)) # Assignment
+        search_space_bit += tcam_num * size_of_key # Value
+        search_space_bit += tcam_num * size_of_key # Mask
+        search_space_bit += tcam_num * math.ceil(math.log2(num_parser_nodes + 1)) # Transition
+        has_run = True
 
+    constraints = [And(assignments[i] >= 0, assignments[i] <= num_parser_nodes) for i in range(tcam_num)]
+    # for i in range(tcam_num - 1):
+    #     constraints.append(assignments[i] <= assignments[i + 1])
+    s.add(constraints)
+    s.add(Flags[0][0] == 1)
+    s.add(Flags[1][1] == 1)
+    s.add(Flags[2][2] == 1)
+    
     if not cexamples:
         # We force the counterexample set to be non-empty
         print("Counterexample set cannot be empty")
@@ -386,30 +494,30 @@ def verification_step(model, cexamples):
     s = Solver()
 
     Flags = flag_gen(num_parser_nodes=num_parser_nodes, num_pkt_fields=num_pkt_fields)    
-    alloc_matrix = alloc_matrix_gen(pkt_field_size_list=pkt_field_size_list)
+    alloc_matrix = alloc_matrix_gen(key_field_list=key_field_list)
     Lookahead = lookahead_gen(num_parser_nodes=num_parser_nodes, lookahead_window_size=lookahead_window_size)
     # Force z3's variables to be the value output from the synthesis phase
     for i in range(len(Flags)):
         for j in range(len(Flags[i])):
-            value = model.evaluate(Flags[i][j], model_completion=True)
-            if value is not None:
-                s.add(Flags[i][j] == value.as_long())
+            if Flags[i][j].decl() in [d for d in model.decls()]:
+                value = model.evaluate(Flags[i][j], model_completion=False).as_long()
             else:
-                s.add(Flags[i][j] == 0)
+                value = 0  # your chosen default
+            s.add(Flags[i][j] == value)
     for i in range(len(alloc_matrix)):
         for j in range(len(alloc_matrix[i])):
-            value = model.evaluate(alloc_matrix[i][j], model_completion=True)
-            if value is not None:
-                s.add(alloc_matrix[i][j] == value.as_long())
+            if alloc_matrix[i][j].decl() in [d for d in model.decls()]:
+                value = model.evaluate(alloc_matrix[i][j], model_completion=False).as_long()
             else:
-                s.add(alloc_matrix[i][j] == -1)
+                value = -1  # your chosen default
+            s.add(alloc_matrix[i][j] == value)
     for i in range(len(Lookahead)):
         for j in range(len(Lookahead[i])):
-            value = model.evaluate(Lookahead[i][j], model_completion=True)
-            if value is not None:
-                s.add(Lookahead[i][j] == value.as_long())
+            if Lookahead[i][j].decl() in [d for d in model.decls()]:
+                value = model.evaluate(Lookahead[i][j], model_completion=False).as_long()
             else:
-                s.add(Lookahead[i][j] == 0)
+                value = 0  # your chosen default
+            s.add(Lookahead[i][j] == value)
     
     assignments = [Int(f'assign_{i}') for i in range(tcam_num)]
     key_val_total_list = [BitVec(f'key_val{i}', size_of_key) for i in range(tcam_num)]
@@ -417,29 +525,32 @@ def verification_step(model, cexamples):
     tran_idx_total_list = [Int(f'tran_idx{i}') for i in range(tcam_num)]
 
     for i in range(len(assignments)):
-        value = model.evaluate(assignments[i], model_completion=True)
-        if value is not None:
-            s.add(assignments[i] == value.as_long())
+        if assignments[i].decl() in [d for d in model.decls()]:
+            value = model.evaluate(assignments[i], model_completion=False).as_long()
         else:
-            s.add(assignments[i] == tcam_num)
+            value = tcam_num  # your chosen default
+        s.add(assignments[i] == value)
+
     for i in range(len(key_val_total_list)):
-        value = model.evaluate(key_val_total_list[i], model_completion=True)
-        if value is not None:
-            s.add(key_val_total_list[i] == value.as_long())
+        if key_val_total_list[i].decl() in [d for d in model.decls()]:
+            value = model.evaluate(key_val_total_list[i], model_completion=False).as_long()
         else:
-            s.add(key_val_total_list[i] == -1)
+            value = -1  # your chosen default
+        s.add(key_val_total_list[i] == value)
+        
     for i in range(len(key_mask_total_list)):
-        value = model.evaluate(key_mask_total_list[i], model_completion=True)
-        if value is not None:
-            s.add(key_mask_total_list[i] == value.as_long())
+        if key_mask_total_list[i].decl() in [d for d in model.decls()]:
+            value = model.evaluate(key_mask_total_list[i], model_completion=False).as_long()
         else:
-            s.add(key_mask_total_list[i] == -1)
+            value = 0  # your chosen default
+        s.add(key_mask_total_list[i] == value)
+        
     for i in range(len(tran_idx_total_list)):
-        value = model.evaluate(tran_idx_total_list[i], model_completion=True)
-        if value is not None:
-            s.add(tran_idx_total_list[i] == value.as_long())
+        if tran_idx_total_list[i].decl() in [d for d in model.decls()]:
+            value = model.evaluate(tran_idx_total_list[i], model_completion=False).as_long()
         else:
-            s.add(tran_idx_total_list[i] == num_parser_nodes)
+            value = num_parser_nodes  # your chosen default
+        s.add(tran_idx_total_list[i] == value)
 
     # key_val_2D_list, key_mask_2D_list = key_val_gen(num_transitions=num_transitions, size_of_key=size_of_key, 
     #                               num_parser_nodes=num_parser_nodes)
@@ -468,11 +579,11 @@ def verification_step(model, cexamples):
 
     default_idx_node_list = default_idx_gen(num_parser_nodes=num_parser_nodes)
     for i in range(len(default_idx_node_list)):
-        value = model.evaluate(default_idx_node_list[i], model_completion=True)
-        if value is not None:
-            s.add(default_idx_node_list[i] == value.as_long())
+        if default_idx_node_list[i].decl() in [d for d in model.decls()]:
+            value = model.evaluate(default_idx_node_list[i], model_completion=False).as_long()
         else:
-            s.add(default_idx_node_list[i] == num_parser_nodes + 1)
+            value = num_parser_nodes + 1 # your chosen default
+        s.add(default_idx_node_list[i] == value)
 
     idx = Int('idx')
     s.add(idx == 0)
@@ -514,9 +625,13 @@ def cegis_loop():
     cexamples = [[0 for _ in range(num_pkt_fields + 1)]]
     # Set the iteration bound
     maxIter = 1000
+    global synthesis_time, verification_time, total_iterations, search_space_bit
     for i in range(maxIter):
         print("cexamples =", cexamples, "# cex =", len(cexamples))
+        start_time = time.time()
         candidate = synthesis_step(cexamples)
+        end_time = time.time()
+        synthesis_time += end_time - start_time
         if candidate is None:
             print("Synthesis failed, no valid function found.")
             return
@@ -525,16 +640,24 @@ def cegis_loop():
         model_dict = {}
         for d in candidate:
             model_dict[d.name()] = candidate[d].as_long()  # Convert Z3 values to Python values
-
         # Convert the dictionary to JSON
         model_json = json.dumps(model_dict)
         p4_in_json = codegen(model_json, number_of_parser_nodes=num_parser_nodes, size_of_key=size_of_key)
         
         # Go to verificaiton phase
+        start_time = time.time()
         cexample = verification_step(model=candidate, cexamples=cexamples)
+        end_time = time.time()
+        verification_time += end_time - start_time
+        if cexample in cexamples:
+            print(f"Duplicate counterexample found: {cexample}")
+            print("model_json =", model_json)
+            print("current output:", p4_in_json)
+            exit(0)
         if cexample is None:
             print("Final output:", p4_in_json)
             print(f"Valid function found")
+            print(f"Synthesis time: {synthesis_time:.2f}s, Verification time: {verification_time:.2f}s, total_iterations = {i+1}, search_space_bit = {search_space_bit}")
             return
         else:
             print(f"Counterexample found: x = {cexample}")
