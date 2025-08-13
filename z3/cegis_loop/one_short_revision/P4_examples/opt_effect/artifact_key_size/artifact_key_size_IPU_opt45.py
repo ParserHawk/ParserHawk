@@ -709,7 +709,7 @@ def cegis_loop():
 
         # Convert the dictionary to JSON
         model_json = json.dumps(model_dict)
-        p4_in_json = codegen(model_json, number_of_parser_nodes=num_parser_nodes, size_of_key=size_of_key)
+        # p4_in_json = codegen(model_json, number_of_parser_nodes=num_parser_nodes, size_of_key=size_of_key)
         
         # Go to verificaiton phase
         start_time = time.time()
@@ -717,7 +717,7 @@ def cegis_loop():
         end_time = time.time()
         verification_time += end_time - start_time
         if cexample is None:
-            print("Final output:", p4_in_json)
+            # print("Final output:", p4_in_json)
             print(f"Valid function found")
             print(f"Synthesis time: {synthesis_time:.2f}s, Verification time: {verification_time:.2f}s, total_iterations = {i+1}, search_space_bit = {search_space_bit}")
             return
