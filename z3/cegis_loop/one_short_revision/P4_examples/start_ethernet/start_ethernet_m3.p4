@@ -50,6 +50,7 @@ parser ParserI(packet_in b,
     state parse_llc_header {
         b.extract(hdr.data);
         transition select(hdr.data.f8) {
+            0 : parse_set_prio_high;
             0 : accept;
             1 : accept;
             default : accept;
