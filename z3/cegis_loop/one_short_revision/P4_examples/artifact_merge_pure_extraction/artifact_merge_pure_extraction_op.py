@@ -346,7 +346,7 @@ def default_idx_gen(num_parser_nodes):
 def synthesis_step(cexamples):
     global has_run
     global search_space_bit
-    print("Enter synthsis phase")
+    # print("Enter synthsis phase")
     # Define all variables
     s = Solver()
     s.reset()
@@ -452,7 +452,7 @@ def synthesis_step(cexamples):
         return None
 
 def verification_step(model, cexamples):
-    print("Enter verification phase")
+    # print("Enter verification phase")
     # Try to find a counterexample where f(x) != g(x)
     x = BitVec('x', input_bit_stream_size)
     s = Solver()
@@ -588,7 +588,7 @@ def cegis_loop():
     maxIter = 50
     global synthesis_time, verification_time, total_iterations
     for i in range(maxIter):
-        print("cexamples =", cexamples, "# cex =", len(cexamples))
+        # print("cexamples =", cexamples, "# cex =", len(cexamples))
         start_time = time.time()
         candidate = synthesis_step(cexamples)
         end_time = time.time()
@@ -612,12 +612,13 @@ def cegis_loop():
         end_time = time.time()
         verification_time += end_time - start_time
         if cexample is None:
-            print("Final output:", p4_in_json)
+            # print("Final output:", p4_in_json)
             print(f"Valid function found")
             print(f"Synthesis time: {synthesis_time:.2f}s, Verification time: {verification_time:.2f}s, total_iterations = {i+1}, search_space_bit = {search_space_bit}")
+            print(f"num of TCAM entry: {tcam_num}")
             return
         else:
-            print(f"Counterexample found: x = {cexample}")
+            # print(f"Counterexample found: x = {cexample}")
             cexamples.append(cexample)  # Add the counterexample for the next round
             # this is not necessary but I do this for debuging purpose TODO: remove the next line
             cexamples = sorted(cexamples)
