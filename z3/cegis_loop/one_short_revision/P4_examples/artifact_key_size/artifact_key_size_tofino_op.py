@@ -590,6 +590,7 @@ def cegis_loop():
             print("Final output:", p4_in_json)
             print(f"Valid function found")
             print(f"Synthesis time: {synthesis_time:.2f}s, Verification time: {verification_time:.2f}s, total_iterations = {i+1}, search_space_bit = {search_space_bit}")
+            print(f"num of TCAM entry: {tcam_num}")
             return
         else:
             print(f"Counterexample found: x = {cexample}")
