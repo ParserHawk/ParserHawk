@@ -162,9 +162,9 @@ def codegen(json_obj, number_of_parser_nodes, size_of_key):
                 key_val_str = "key_val" + str(tran_logicID)
                 key_mask_str = "key_mask" + str(tran_logicID)
                 if assign_val_str in data and key_mask_str in data and key_val_str in data:
-                    print(f"{assign_val_str} =".format(assign_val_str), data[assign_val_str], 
-                          f"{key_val_str} =".format(key_val_str), data[key_val_str], f"{key_mask_str} =".format(key_mask_str), data[key_mask_str], 
-                          f"{v} =".format(v), data[v])
+                    # print(f"{assign_val_str} =".format(assign_val_str), data[assign_val_str], 
+                    #       f"{key_val_str} =".format(key_val_str), data[key_val_str], f"{key_mask_str} =".format(key_mask_str), data[key_mask_str], 
+                    #       f"{v} =".format(v), data[v])
                     nodeID = int(data[assign_val_str])
                     if nodeID < number_of_parser_nodes:
                         if "tran_logic" not in node_list[nodeID]:
