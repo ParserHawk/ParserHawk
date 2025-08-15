@@ -10,7 +10,6 @@ import time
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../../')))
 # Now you can import the library from Folder B
-from practical_ex.code_gen_big_tcam import *
 
 """
 spec:

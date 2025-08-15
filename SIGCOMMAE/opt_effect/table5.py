@@ -74,3 +74,5 @@ for i, col in enumerate(df.columns):
     df_centered.rename(columns={col: str(col).center(col_widths[i])}, inplace=True)
 
 print(df_centered.to_string(index=False))
+
+df_centered.to_csv("table5.csv", index=False)
