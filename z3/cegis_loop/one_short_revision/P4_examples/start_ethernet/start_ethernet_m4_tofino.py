@@ -51,7 +51,8 @@ def specification(Input_bitstream, initial_field_val_list):
     #  pos 0   1  2  3 4
     #  idx 13 12 11 10 9 8 
     O_field0 = Extract(input_bit_stream_size - 1, input_bit_stream_size - 1 - pkt_field_size_list[0] + 1, Input_bitstream) #node 0
-    O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0xfa00, 16)) == (BitVecVal(0b0000000000000000, 16) & BitVecVal(0xfa00, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
+    O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0b1111111000000000, 16)) == (BitVecVal(0b0000000000000000, 16) & BitVecVal(0b1111111000000000, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
+    O_field1 = If((Extract(15, 0, O_field0) & BitVecVal(0b1111101000000000, 16)) == (BitVecVal(0b0000000000000000, 16) & BitVecVal(0b1111101000000000, 16)), Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), O_field1)
     
     return [O_field0, O_field1]
 
@@ -62,7 +63,7 @@ def spec(Input_bitstream, initial_list):
     # l = [int(Input_bitstream[0 : 4], 2), int(Input_bitstream[4 : 8], 2)
     Fields = ["" for _ in range(num_pkt_fields)]
     Fields[0] = Input_bitstream[0 : pkt_field_size_list[0]]
-    if ((int(Fields[0][8 : 24], 2) & int("1111101000000000", 2)) == int("0000000000000000", 2)):
+    if ((int(Fields[0][8 : 24], 2) & int("1111111000000000", 2)) == int("0000000000000000", 2)) or ((int(Fields[0][8 : 24], 2) & int("1111101000000000", 2)) == int("0000000000000000", 2)):
         Fields[1] = Input_bitstream[pkt_field_size_list[0] : pkt_field_size_list[0] + pkt_field_size_list[1]]
     l = []
     for i in range(num_pkt_fields):
@@ -109,7 +110,6 @@ def generate_tran_key(alloc_matrix, node_id, update_field_val_l,
     dummy = BitVec('dummy', 1)
     s.add(dummy == 0)
     key_sel = None
-    # Only extracted fields can be used as the state transition key
 
     for i in range(len(alloc_matrix)):
         for j in range(len(alloc_matrix[i]) - 1, -1, -1):
@@ -148,7 +148,6 @@ def generate_return_idx(assignments, key_val_total_list, key_mask_total_list, tr
     ret_idx = If(idx == node_id, ret_idx, idx)
     return ret_idx
 
-
 def new_node(nodeID, Dist, F, I, idx, pos, alloc_matrix, Lookahead, assignments, key_val_total_list, key_mask_total_list, tran_idx_total_list, default_idx_node, s):
     key_expr_list = generate_key_expr_list(s, pos, I, Dist, F, alloc_matrix)
     update_field_val_l = generate_update_field_val(idx, Dist, F, key_expr_list, alloc_matrix, s, node_id = nodeID)
@@ -182,7 +181,6 @@ def temporary_bitvec_for_counterexample(I_val, random_initial_value_list, num_pk
     constraint.append(input_field0 == random_initial_value_list[0])
     constraint.append(input_field1 == random_initial_value_list[1])
     # constraint.append(input_field2 == random_initial_value_list[2])
-    # return Input_bitstream, [input_field0, input_field1, input_field2], extract_status, constraint
     return Input_bitstream, [input_field0, input_field1], constraint
 
 # Implementation, concrete z3 variables' values are decided by the z3 solver
@@ -515,7 +513,7 @@ def cegis_loop():
     # Start with one counterexamples  
     cexamples = [[0 for _ in range(num_pkt_fields + 1)]]
     # Set the iteration bound
-    maxIter = 1000
+    maxIter = 50
     for i in range(maxIter):
         print("cexamples =", cexamples, "# cex =", len(cexamples))
         candidate = synthesis_step(cexamples)
@@ -535,7 +533,6 @@ def cegis_loop():
         # Go to verificaiton phase
         cexample = verification_step(model=candidate, cexamples=cexamples)
         if cexample is None:
-            print("model_json =", model_json)
             print("Final output:", p4_in_json)
             print(f"Valid function found")
             return
