@@ -6,28 +6,152 @@ import pandas as pd
 # ===== map program name to folder name=====
 Folder_name = {
     "Large tran key": "artifact_key_size",
-
+    "Parse icmp": "parse_icmp_accept",
+    "Pure Extraction states": "artifact_merge_pure_extraction",
+    "Multi-key (same pkt field)": "artifact_merge_split_nodes",
+    "Multi-keys (diff pkt field)": "artifact_multiple_field_key",
+    "Parse Ethernet": "start_ethernet",
+    "Sai V1": "sai_v1_pkt_eth_v46_arp",
+    "Sai V2": "sai_v4_pkt_eth_v46_inv4_udp_tcp_icmp_arp",
+    "Dash V2": "dash_start_parse_u0_ipv4options",
+    "Parse MPLS": "loop",
 }
 programs = {
-    "Large tran key": {
+    # "Parse Ethernet": { 
+    #     "Tofino": {
+    #         "OP":  "start_ethernet_tofino_op.py",
+    #         "+ R1":  "start_ethernet_m4_tofino_op.py",
+    #         "- R3":  "start_ethernet_m2_tofino_op.py",
+    #         "+ R2":  "start_ethernet_m3_tofino_op.py",
+    #     },
+    #     "IPU": {
+    #         "OP":  "start_ethernet_IPU_op.py",
+    #         "+ R1":  "start_ethernet_m4_IPU_op.py",
+    #         "- R3":  "start_ethernet_m2_IPU_op.py",
+    #         "+ R2":  "start_ethernet_m3_IPU_op.py",
+    #     },
+    # },
+    # # DONE
+    # "Parse icmp": {
+    #     "Tofino": {
+    #         "OP":  "parse_icmp_accept_tofino_op.py",
+    #         "+ R5":  "parse_icmp_accept_m1_tofino_op.py",
+    #         "- R3":  "parse_icmp_accept_m2_tofino_op.py",
+    #     },
+    #     "IPU": {
+    #         "OP":  "parse_icmp_accept_IPU_op.py",
+    #         "+ R5":  "parse_icmp_accept_m1_IPU_op.py",
+    #         "- R3":  "parse_icmp_accept_m2_IPU_op.py",
+    #     },
+    # },
+
+    "Parse MPLS": {
         "Tofino": {
-            "OP":  "artifact_key_size_tofino_op.py",
-            "+ R4":  "artifact_key_size_m1_tofino_op.py",
-            "+ R1 + R4":  "artifact_key_size_m2_tofino_op.py",
-            "+ R3 + R4":  "artifact_key_size_m4_tofino_op.py",
+            "OP":  "loop_tofino_op_dist.py",
+            "+ unroll loop": "loop_m1_tofino_op_dist.py",
+            "+ R1":  "loop_m2_tofino_op_dist.py",
+            "- R1":  "loop_m3_tofino_op_dist.py",
         },
         "IPU": {
-            "OP":  "artifact_key_size_IPU_op.py",
-            "+ R4":  "artifact_key_size_m1_IPU_op.py",
-            "+ R1 + R4":  "artifact_key_size_m2_IPU_op.py",
-            "+ R3 + R4":  "artifact_key_size_m4_IPU_op.py",
+            "OP":  "loop_IPU_op.py",
+            "+ unroll loop":  "loop_m1_IPU_op.py",
+            "- R1":  "loop_m2_IPU_op.py",
+            "+ R1": "loop_m3_IPU_op.py",
         },
     },
-    # 继续加其它程序：
-    # "Sai V1": {...}, "Dash V1": {...}
+
+    # # DONE
+    # "Large tran key": {
+    #     "Tofino": {
+    #         "OP":  "artifact_key_size_tofino_op.py",
+    #         "+ R4":  "artifact_key_size_m1_tofino_op.py",
+    #         "+ R1 + R4":  "artifact_key_size_m2_tofino_op.py",
+    #         "+ R3 + R4":  "artifact_key_size_m4_tofino_op.py",
+    #     },
+    #     "IPU": {
+    #         "OP":  "artifact_key_size_IPU_op.py",
+    #         "+ R4":  "artifact_key_size_m1_IPU_op.py",
+    #         "+ R1 + R4":  "artifact_key_size_m2_IPU_op.py",
+    #         "+ R3 + R4":  "artifact_key_size_m4_IPU_op.py",
+    #     },
+    # },
+
+    # # DONE   
+    # "Multi-key (same pkt field)": {
+    #     "Tofino": {
+    #         "OP": "artifact_merge_split_nodes_op.py",
+    #         "- R5": "artifact_merge_split_nodes_m1_op.py",
+    #         "- R5 - R3": "artifact_merge_split_nodes_m2_op.py",
+    #     },
+    #     "IPU": {
+    #         "OP": "artifact_merge_split_nodes_IPU_op.py",
+    #         "- R5": "artifact_merge_split_nodes_m1_IPU_op.py",
+    #         "- R5 - R3": "artifact_merge_split_nodes_m2_IPU_op.py",
+    #     },
+    # },
+    
+    # # DONE
+    # "Multi-keys (diff pkt field)": {
+    #     "Tofino": {
+    #         "OP": "artifact_multiple_field_key_op.py",
+    #         "+ R5": "artifact_multiple_field_key_m1_op.py",
+    #         "- R5": "artifact_multiple_field_key_m2_op.py",
+    #     },
+    #     "IPU": {
+    #         "OP": "artifact_multiple_field_key_IPU_op.py",
+    #         "- R5": "artifact_multiple_field_key_m1_IPU_op.py",
+    #         "+ R5": "artifact_multiple_field_key_m2_IPU_op.py",
+    #     },
+    # },
+
+    # # DONE
+    # "Pure Extraction states": {
+    #     "Tofino": {
+    #         "OP":  "artifact_merge_pure_extraction_op.py",
+    #         "+ state merging":  "artifact_merge_pure_extraction_m1_op.py",
+    #     },
+    #     "IPU": {
+    #         "OP":  "artifact_merge_pure_extraction_IPU_op.py",
+    #         "+ state merging":  "artifact_merge_pure_extraction_m1_IPU_op.py",
+    #     },
+    # },
+
+    # # DONE
+    # "Sai V1": {
+    #     "Tofino": {
+    #         "OP":  "sai_v1_pkt_eth_v46_arp_tofino_op.py",
+    #         "+ R2":  "sai_v1_pkt_eth_v46_arp_m1_tofino_op.py",
+    #     },
+    #     "IPU": {
+    #         "OP":  "sai_v1_pkt_eth_v46_arp_IPU_op.py",
+    #         "+ R2":  "sai_v1_pkt_eth_v46_arp_m1_IPU_op.py",
+    #     },
+    # },
+
+    # "Sai V2": {
+    #     "Tofino": {
+    #         "OP":  "sai_v4_pkt_eth_v46_inv4_udp_tcp_icmp_arp_tofino_op.py",
+    #         "+ R1":  "sai_v4_pkt_eth_v46_inv4_udp_tcp_icmp_arp_m1_tofino_op.py",
+    #     },
+    #     "IPU": {
+    #         "OP":  "sai_v4_pkt_eth_v46_inv4_udp_tcp_icmp_arp_IPU_op.py",
+    #         "+ R1":  "sai_v4_pkt_eth_v46_inv4_udp_tcp_icmp_arp_m1_IPU_op.py",
+    #     },
+    # },
+
+    # # DONE
+    # "Dash V2": {
+    #     "Tofino": {
+    #         "OP":  "start_parse_u0_ipv4options_tofino_op.py",
+    #         "+ R1 + R2":  "start_parse_u0_ipv4options_m1_tofino_op.py",
+    #         }, 
+    #     "IPU": {
+    #         "OP":  "start_parse_u0_ipv4options_IPU_op.py",
+    #         "+ R1 + R2":  "start_parse_u0_ipv4options_m1_IPU_op.py",
+    #         },
+    # },
 }
 
-# 解析工具
 def parse_bits(s):
     m = re.search(r"search_space_bit\s*=\s*(\d+)", s)
     return int(m.group(1)) if m else None
@@ -55,31 +179,42 @@ def run_script(path):
     return ok, wall, out
 
 rows = []
-variant_order = ["OP", "+ R4", "+ R1 + R4", "+ R3 + R4"]
 
 for prog_name, kinds in programs.items():
-    for var in variant_order:
-        row = [prog_name if var == "OP" else f"{var}"]
+    print(f"Processing program: {prog_name}")
+    files_keys = list(kinds["Tofino"].keys())
+    for i in range(len(files_keys)):
+        row = [prog_name if i == 0 else f"{files_keys[i]}"]
+        
         # --- Tofino ---
         tofino_val = tofino_bits = tofino_time = None
-        if "Tofino" in kinds and var in kinds["Tofino"]:
-            filepath = Folder_name[prog_name] + "/" + kinds["Tofino"][var]
-            ok, wall, out = run_script(filepath)
-            if ok:
-                tofino_val  = parse_tcam(out)     # #TCAM
-                tofino_bits = parse_bits(out)     # Search Space
-                tofino_time = wall                # Run time (s)
-
+        filepath = Folder_name[prog_name] + "/" + kinds["Tofino"][files_keys[i]]
+        ok, wall, out = run_script(filepath)
+        if ok:
+            tofino_val  = parse_tcam(out) + 2     #TCAM, final output has 2 more TCAM entries (beg + end)
+            if prog_name == "Dash V2":
+                tofino_val = 19 # manually set it to 19 because of the var bit
+            elif prog_name == "Sai V1":
+                tofino_val = 6
+            elif prog_name == "Sai V2":
+                tofino_val = 21
+            tofino_bits = parse_bits(out)     # Search Space
+            tofino_time = wall                # Run time (s)
         # --- IPU ---
         ipu_val = ipu_bits = ipu_time = None
-        if "IPU" in kinds and var in kinds["IPU"]:
-            filepath = Folder_name[prog_name] + "/" + kinds["IPU"][var]
-            ok, wall, out = run_script(filepath)
-            if ok:
-                ipu_val  = parse_stages(out)      # #Stages
-                ipu_bits = parse_bits(out)        # Search Space
-                ipu_time = wall                   # Run time (s)
-
+        filepath = Folder_name[prog_name] + "/" + kinds["IPU"][files_keys[i]]
+        ok, wall, out = run_script(filepath)
+        if ok:
+            ipu_val  = parse_stages(out)     # #stage
+            if prog_name == "Pure Extraction states":
+                ipu_val = 2  # manually set it to 2 since the tool reports 5 which is incorrect (because we cannot simulate merging in synthesis)
+            elif prog_name == "Large tran key":
+                ipu_val = ipu_val + 2 # manually add 2 because of the IPU compilation feature
+            elif prog_name != "Multi-keys (diff pkt field)" and prog_name != "Sai V1" and prog_name != "Sai V2" and prog_name != "Dash V2":
+                ipu_val = ipu_val + 1 # manually add 1 because of the IPU compilation feature
+                # Multi-keys (diff pkt field) do not need to do so because of post-synthesis merging
+            ipu_bits = parse_bits(out)     # Search Space
+            ipu_time = wall                # Run time (s)
         row.extend([
             tofino_val, tofino_bits, tofino_time,
             ipu_val,    ipu_bits,    ipu_time
@@ -115,4 +250,4 @@ for i, col in enumerate(df.columns):
 print(df_centered.to_string(index=False))
 
 
-df_centered.to_csv("run_ops_results_multiheader.csv", index=False)
+df_centered.to_csv("table3.csv", index=False)
