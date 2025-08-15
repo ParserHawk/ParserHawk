@@ -10,8 +10,7 @@ data {
 		tranKey : 16 : extract,
 	}
 	next_header = map(tranKey) {
-		0x1, 0x0 : data1,
-		0x2, 0x3 : data2,
+		0xC, 0x0, 0x1111 : data1,
 	}
 }
 
@@ -24,7 +23,6 @@ data1 {
 
 data2 {
 	fields {
-		f8 : 8 : extract,
-		f16 : 16 : extract,
+		f8 : 16 : extract,
 	}
 }

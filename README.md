@@ -42,7 +42,8 @@ source setup/env_setup.sh
 ```
 python2 bin/make_tcam.py examples/Large_tran_key.txt --lookups 1 --lookup-width 4 --no-first-lookup-at-zero --save-tcam
 python2 bin/make_tcam.py examples/ME1.txt --lookups 1 --lookup-width 1 --no-first-lookup-at-zero --save-tcam
-
+python2 bin/make_tcam.py examples/ME2.txt --lookups 1 --lookup-width 2 --no-first-lookup-at-zero --save-tcam
+python2 bin/make_tcam.py examples/ME2.txt --lookups 1 --lookup-width 1 --no-first-lookup-at-zero --save-tcam
 python2 bin/make_tcam.py examples/ME3.txt --lookups 1 --lookup-width 2 --no-first-lookup-at-zero --save-tcam
 ```
 * Table 5: 
