@@ -24,19 +24,23 @@ All experiments were run on CloudLab x86_64 rs630 nodes in the Massachusetts clu
 
 ### Executing program
 
-* 
-* Run the program (e.g., example1): ```python3 io_examples1.py```
-<!-- * Step-by-step bullets
+* Table 3: 
+* Table 4: 
 ```
-code blocks for commands
-``` -->
-
-<!-- ## Help
-
-Any advise for common problems or issues.
+sudo apt install python2 
+pip2 install pyparsing
+cd baseline/parser-gen/
+source setup/env_setup.sh
+``` 
 ```
-command to run if program contains helper info
-``` -->
+python2 bin/make_tcam.py examples/Large_tran_key.txt --lookups 1 --lookup-width 4 --no-first-lookup-at-zero --save-tcam
+python2 bin/make_tcam.py examples/ME1.txt --lookups 1 --lookup-width 1 --no-first-lookup-at-zero --save-tcam
 
-
-
+python2 bin/make_tcam.py examples/ME3.txt --lookups 1 --lookup-width 2 --no-first-lookup-at-zero --save-tcam
+```
+* Table 5: 
+Print results into table5.csv using the following command.
+``` 
+cd SIGCOMMAE/opt_effect
+python3 table5.py
+``` 
