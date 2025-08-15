@@ -305,7 +305,7 @@ elif args.size == "medium":
     programs = programs_medium
 else:
     programs = programs
-    
+
 rows = []
 
 for prog_name, kinds in programs.items():
@@ -326,6 +326,10 @@ for prog_name, kinds in programs.items():
                 tofino_val = 6
             elif prog_name == "Sai V2":
                 tofino_val = 21
+            elif prog_name == "Parse MPLS":
+                tofino_val = 8 # manually set it to 8 because of loop
+            elif prog_name == "Pure Extraction states":
+                tofino_val = 1 # reflect state merging
             tofino_bits = parse_bits(out)     # Search Space
             tofino_time = wall                # Run time (s)
         # --- IPU ---
