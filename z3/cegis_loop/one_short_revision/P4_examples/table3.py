@@ -130,16 +130,16 @@ programs = {
         },
     },
 
-    # "Sai V2": {
-    #     "Tofino": {
-    #         "OP":  "sai_v4_pkt_eth_v46_inv4_udp_tcp_icmp_arp_tofino_op.py",
-    #         "+ R1":  "sai_v4_pkt_eth_v46_inv4_udp_tcp_icmp_arp_m1_tofino_op.py",
-    #     },
-    #     "IPU": {
-    #         "OP":  "sai_v4_pkt_eth_v46_inv4_udp_tcp_icmp_arp_IPU_op.py",
-    #         "+ R1":  "sai_v4_pkt_eth_v46_inv4_udp_tcp_icmp_arp_m1_IPU_op.py",
-    #     },
-    # },
+    "Sai V2": {
+        "Tofino": {
+            "OP":  "sai_v4_pkt_eth_v46_inv4_udp_tcp_icmp_arp_tofino_op.py",
+            "+ R1":  "sai_v4_pkt_eth_v46_inv4_udp_tcp_icmp_arp_m1_tofino_op.py",
+        },
+        "IPU": {
+            "OP":  "sai_v4_pkt_eth_v46_inv4_udp_tcp_icmp_arp_IPU_op.py",
+            "+ R1":  "sai_v4_pkt_eth_v46_inv4_udp_tcp_icmp_arp_m1_IPU_op.py",
+        },
+    },
 
     # DONE
     "Dash V2": {
