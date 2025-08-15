@@ -1,0 +1,24 @@
+#
+# Large tran key graph example:
+#
+#
+
+
+data {
+	fields {
+		f8 : 32 : extract,
+		f33 : 33 : extract,
+		f7 : 7 : extract,
+	}
+	next_header = map(f33) {
+		0x0, 0x1 : data1,
+	}
+	# This is some test code
+}
+
+data1 {
+	fields {
+		f8 : 8 : extract,
+		f16 : 16 : extract,
+	}
+}

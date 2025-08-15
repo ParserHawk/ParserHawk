@@ -1,0 +1,29 @@
+#
+# ME1 example:
+#
+#
+
+
+data {
+	fields {
+		f16 : 16 : extract,
+		tranKey : 16 : extract,
+	}
+	next_header = map(tranKey) {
+		0xF, 0xB, 0x7, 0x3 : data1,
+		0x1 : data2,
+	}
+}
+
+data1 {
+	fields {
+		f8 : 8 : extract,
+		f16 : 16 : extract,
+	}
+}
+
+data2 {
+	fields {
+		f8 : 8 : extract,
+	}
+}
