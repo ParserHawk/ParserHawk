@@ -2,6 +2,8 @@ import subprocess
 import time
 import re
 import pandas as pd
+import argparse
+
 
 # ===== map program name to folder name=====
 Folder_name = {
@@ -116,17 +118,17 @@ programs = {
         },
     },
 
-    # # DONE
-    # "Sai V1": {
-    #     "Tofino": {
-    #         "OP":  "sai_v1_pkt_eth_v46_arp_tofino_op.py",
-    #         "+ R2":  "sai_v1_pkt_eth_v46_arp_m1_tofino_op.py",
-    #     },
-    #     "IPU": {
-    #         "OP":  "sai_v1_pkt_eth_v46_arp_IPU_op.py",
-    #         "+ R2":  "sai_v1_pkt_eth_v46_arp_m1_IPU_op.py",
-    #     },
-    # },
+    # DONE
+    "Sai V1": {
+        "Tofino": {
+            "OP":  "sai_v1_pkt_eth_v46_arp_tofino_op.py",
+            "+ R2":  "sai_v1_pkt_eth_v46_arp_m1_tofino_op.py",
+        },
+        "IPU": {
+            "OP":  "sai_v1_pkt_eth_v46_arp_IPU_op.py",
+            "+ R2":  "sai_v1_pkt_eth_v46_arp_m1_IPU_op.py",
+        },
+    },
 
     # "Sai V2": {
     #     "Tofino": {
@@ -139,17 +141,17 @@ programs = {
     #     },
     # },
 
-    # # DONE
-    # "Dash V2": {
-    #     "Tofino": {
-    #         "OP":  "start_parse_u0_ipv4options_tofino_op.py",
-    #         "+ R1 + R2":  "start_parse_u0_ipv4options_m1_tofino_op.py",
-    #         }, 
-    #     "IPU": {
-    #         "OP":  "start_parse_u0_ipv4options_IPU_op.py",
-    #         "+ R1 + R2":  "start_parse_u0_ipv4options_m1_IPU_op.py",
-    #         },
-    # },
+    # DONE
+    "Dash V2": {
+        "Tofino": {
+            "OP":  "start_parse_u0_ipv4options_tofino_op.py",
+            "+ R1 + R2":  "start_parse_u0_ipv4options_m1_tofino_op.py",
+            }, 
+        "IPU": {
+            "OP":  "start_parse_u0_ipv4options_IPU_op.py",
+            "+ R1 + R2":  "start_parse_u0_ipv4options_m1_IPU_op.py",
+            },
+    },
 }
 
 def parse_bits(s):
@@ -178,6 +180,132 @@ def run_script(path):
     ok = ("Valid function found" in out)
     return ok, wall, out
 
+parser = argparse.ArgumentParser()
+parser.add_argument("size", choices=["small", "medium", "large"], help="Run scale: small / medium / large")
+args = parser.parse_args()
+
+programs_small = {
+    "Parse Ethernet": { 
+        "Tofino": {
+            "OP":  "start_ethernet_tofino_op.py",
+            "+ R1":  "start_ethernet_m4_tofino_op.py",
+            "- R3":  "start_ethernet_m2_tofino_op.py",
+            "+ R2":  "start_ethernet_m3_tofino_op.py",
+        },
+        "IPU": {
+            "OP":  "start_ethernet_IPU_op.py",
+            "+ R1":  "start_ethernet_m4_IPU_op.py",
+            "- R3":  "start_ethernet_m2_IPU_op.py",
+            "+ R2":  "start_ethernet_m3_IPU_op.py",
+        },
+    },
+    "Parse icmp": {
+        "Tofino": {
+            "OP":  "parse_icmp_accept_tofino_op.py",
+            "+ R5":  "parse_icmp_accept_m1_tofino_op.py",
+            "- R3":  "parse_icmp_accept_m2_tofino_op.py",
+        },
+        "IPU": {
+            "OP":  "parse_icmp_accept_IPU_op.py",
+            "+ R5":  "parse_icmp_accept_m1_IPU_op.py",
+            "- R3":  "parse_icmp_accept_m2_IPU_op.py",
+        },
+    },
+    "Parse MPLS": {
+        "Tofino": {
+            "OP":  "loop_tofino_op_dist.py",
+            "+ unroll loop": "loop_m1_tofino_op_dist.py",
+            "+ R1":  "loop_m2_tofino_op_dist.py",
+            "- R1":  "loop_m3_tofino_op_dist.py",
+        },
+        "IPU": {
+            "OP":  "loop_IPU_op.py",
+            "+ unroll loop":  "loop_m1_IPU_op.py",
+            "- R1":  "loop_m2_IPU_op.py",
+            "+ R1": "loop_m3_IPU_op.py",
+        },
+    },
+    "Large tran key": {
+        "Tofino": {
+            "OP":  "artifact_key_size_tofino_op.py",
+            "+ R4":  "artifact_key_size_m1_tofino_op.py",
+            "+ R1 + R4":  "artifact_key_size_m2_tofino_op.py",
+            "+ R3 + R4":  "artifact_key_size_m4_tofino_op.py",
+        },
+        "IPU": {
+            "OP":  "artifact_key_size_IPU_op.py",
+            "+ R4":  "artifact_key_size_m1_IPU_op.py",
+            "+ R1 + R4":  "artifact_key_size_m2_IPU_op.py",
+            "+ R3 + R4":  "artifact_key_size_m4_IPU_op.py",
+        },
+    },
+    "Multi-key (same pkt field)": {
+        "Tofino": {
+            "OP": "artifact_merge_split_nodes_op.py",
+            "- R5": "artifact_merge_split_nodes_m1_op.py",
+            "- R5 - R3": "artifact_merge_split_nodes_m2_op.py",
+        },
+        "IPU": {
+            "OP": "artifact_merge_split_nodes_IPU_op.py",
+            "- R5": "artifact_merge_split_nodes_m1_IPU_op.py",
+            "- R5 - R3": "artifact_merge_split_nodes_m2_IPU_op.py",
+        },
+    },
+    "Multi-keys (diff pkt field)": {
+        "Tofino": {
+            "OP": "artifact_multiple_field_key_op.py",
+            "+ R5": "artifact_multiple_field_key_m1_op.py",
+            "- R5": "artifact_multiple_field_key_m2_op.py",
+        },
+        "IPU": {
+            "OP": "artifact_multiple_field_key_IPU_op.py",
+            "- R5": "artifact_multiple_field_key_m1_IPU_op.py",
+            "+ R5": "artifact_multiple_field_key_m2_IPU_op.py",
+        },
+    },
+}
+
+programs_medium = programs_small.copy()
+programs_medium.update({
+    "Pure Extraction states": {
+        "Tofino": {
+            "OP":  "artifact_merge_pure_extraction_op.py",
+            "+ state merging":  "artifact_merge_pure_extraction_m1_op.py",
+        },
+        "IPU": {
+            "OP":  "artifact_merge_pure_extraction_IPU_op.py",
+            "+ state merging":  "artifact_merge_pure_extraction_m1_IPU_op.py",
+        },
+    },
+    "Sai V1": {
+        "Tofino": {
+            "OP":  "sai_v1_pkt_eth_v46_arp_tofino_op.py",
+            "+ R2":  "sai_v1_pkt_eth_v46_arp_m1_tofino_op.py",
+        },
+        "IPU": {
+            "OP":  "sai_v1_pkt_eth_v46_arp_IPU_op.py",
+            "+ R2":  "sai_v1_pkt_eth_v46_arp_m1_IPU_op.py",
+        },
+    },
+    "Dash V2": {
+        "Tofino": {
+            "OP":  "start_parse_u0_ipv4options_tofino_op.py",
+            "+ R1 + R2":  "start_parse_u0_ipv4options_m1_tofino_op.py",
+            }, 
+        "IPU": {
+            "OP":  "start_parse_u0_ipv4options_IPU_op.py",
+            "+ R1 + R2":  "start_parse_u0_ipv4options_m1_IPU_op.py",
+            },
+    },
+})
+
+if args.size == "small":
+    programs = programs_small
+elif args.size == "medium":
+    programs = programs_medium
+else:
+    programs = programs
+    
 rows = []
 
 for prog_name, kinds in programs.items():
