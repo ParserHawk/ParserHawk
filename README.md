@@ -25,6 +25,13 @@ All experiments were run on CloudLab x86_64 rs630 nodes in the Massachusetts clu
 ### Executing program
 
 * Table 3: 
+Print results into table3.csv using the following command.
+```
+cd z3/cegis_loop/one_short_revision/P4_examples
+python3 table3.py small # small is recommended (run for around 10 mins); medium takes 20 min or large takes 24h
+python3 table3_nop.py small # small is recommended (run for around 15 mins)
+```
+
 * Table 4: 
 ```
 sudo apt install python2 
