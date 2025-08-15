@@ -36,15 +36,11 @@ python3 table3_nop.py small # small is recommended (run for around 15 mins)
 ```
 sudo apt install python2 
 pip2 install pyparsing
-cd baseline/parser-gen/
+cd DPParserGen/parser-gen/
 source setup/env_setup.sh
 ``` 
 ```
-python2 bin/make_tcam.py examples/Large_tran_key.txt --lookups 1 --lookup-width 4 --no-first-lookup-at-zero --save-tcam
-python2 bin/make_tcam.py examples/ME1.txt --lookups 1 --lookup-width 1 --no-first-lookup-at-zero --save-tcam
-python2 bin/make_tcam.py examples/ME2.txt --lookups 1 --lookup-width 2 --no-first-lookup-at-zero --save-tcam
-python2 bin/make_tcam.py examples/ME2.txt --lookups 1 --lookup-width 1 --no-first-lookup-at-zero --save-tcam
-python2 bin/make_tcam.py examples/ME3.txt --lookups 1 --lookup-width 2 --no-first-lookup-at-zero --save-tcam
+python3 table4.py
 ```
 * Table 5: 
 Print results into table5.csv using the following command.
