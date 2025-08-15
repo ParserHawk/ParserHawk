@@ -17,33 +17,33 @@ Folder_name = {
     "Parse MPLS": "loop",
 }
 programs = {
-    # "Parse Ethernet": { 
-    #     "Tofino": {
-    #         "OP":  "start_ethernet_tofino_op.py",
-    #         "+ R1":  "start_ethernet_m4_tofino_op.py",
-    #         "- R3":  "start_ethernet_m2_tofino_op.py",
-    #         "+ R2":  "start_ethernet_m3_tofino_op.py",
-    #     },
-    #     "IPU": {
-    #         "OP":  "start_ethernet_IPU_op.py",
-    #         "+ R1":  "start_ethernet_m4_IPU_op.py",
-    #         "- R3":  "start_ethernet_m2_IPU_op.py",
-    #         "+ R2":  "start_ethernet_m3_IPU_op.py",
-    #     },
-    # },
-    # # DONE
-    # "Parse icmp": {
-    #     "Tofino": {
-    #         "OP":  "parse_icmp_accept_tofino_op.py",
-    #         "+ R5":  "parse_icmp_accept_m1_tofino_op.py",
-    #         "- R3":  "parse_icmp_accept_m2_tofino_op.py",
-    #     },
-    #     "IPU": {
-    #         "OP":  "parse_icmp_accept_IPU_op.py",
-    #         "+ R5":  "parse_icmp_accept_m1_IPU_op.py",
-    #         "- R3":  "parse_icmp_accept_m2_IPU_op.py",
-    #     },
-    # },
+    "Parse Ethernet": { 
+        "Tofino": {
+            "OP":  "start_ethernet_tofino_op.py",
+            "+ R1":  "start_ethernet_m4_tofino_op.py",
+            "- R3":  "start_ethernet_m2_tofino_op.py",
+            "+ R2":  "start_ethernet_m3_tofino_op.py",
+        },
+        "IPU": {
+            "OP":  "start_ethernet_IPU_op.py",
+            "+ R1":  "start_ethernet_m4_IPU_op.py",
+            "- R3":  "start_ethernet_m2_IPU_op.py",
+            "+ R2":  "start_ethernet_m3_IPU_op.py",
+        },
+    },
+    # DONE
+    "Parse icmp": {
+        "Tofino": {
+            "OP":  "parse_icmp_accept_tofino_op.py",
+            "+ R5":  "parse_icmp_accept_m1_tofino_op.py",
+            "- R3":  "parse_icmp_accept_m2_tofino_op.py",
+        },
+        "IPU": {
+            "OP":  "parse_icmp_accept_IPU_op.py",
+            "+ R5":  "parse_icmp_accept_m1_IPU_op.py",
+            "- R3":  "parse_icmp_accept_m2_IPU_op.py",
+        },
+    },
 
     "Parse MPLS": {
         "Tofino": {
@@ -60,61 +60,61 @@ programs = {
         },
     },
 
-    # # DONE
-    # "Large tran key": {
-    #     "Tofino": {
-    #         "OP":  "artifact_key_size_tofino_op.py",
-    #         "+ R4":  "artifact_key_size_m1_tofino_op.py",
-    #         "+ R1 + R4":  "artifact_key_size_m2_tofino_op.py",
-    #         "+ R3 + R4":  "artifact_key_size_m4_tofino_op.py",
-    #     },
-    #     "IPU": {
-    #         "OP":  "artifact_key_size_IPU_op.py",
-    #         "+ R4":  "artifact_key_size_m1_IPU_op.py",
-    #         "+ R1 + R4":  "artifact_key_size_m2_IPU_op.py",
-    #         "+ R3 + R4":  "artifact_key_size_m4_IPU_op.py",
-    #     },
-    # },
+    # DONE
+    "Large tran key": {
+        "Tofino": {
+            "OP":  "artifact_key_size_tofino_op.py",
+            "+ R4":  "artifact_key_size_m1_tofino_op.py",
+            "+ R1 + R4":  "artifact_key_size_m2_tofino_op.py",
+            "+ R3 + R4":  "artifact_key_size_m4_tofino_op.py",
+        },
+        "IPU": {
+            "OP":  "artifact_key_size_IPU_op.py",
+            "+ R4":  "artifact_key_size_m1_IPU_op.py",
+            "+ R1 + R4":  "artifact_key_size_m2_IPU_op.py",
+            "+ R3 + R4":  "artifact_key_size_m4_IPU_op.py",
+        },
+    },
 
-    # # DONE   
-    # "Multi-key (same pkt field)": {
-    #     "Tofino": {
-    #         "OP": "artifact_merge_split_nodes_op.py",
-    #         "- R5": "artifact_merge_split_nodes_m1_op.py",
-    #         "- R5 - R3": "artifact_merge_split_nodes_m2_op.py",
-    #     },
-    #     "IPU": {
-    #         "OP": "artifact_merge_split_nodes_IPU_op.py",
-    #         "- R5": "artifact_merge_split_nodes_m1_IPU_op.py",
-    #         "- R5 - R3": "artifact_merge_split_nodes_m2_IPU_op.py",
-    #     },
-    # },
+    # DONE   
+    "Multi-key (same pkt field)": {
+        "Tofino": {
+            "OP": "artifact_merge_split_nodes_op.py",
+            "- R5": "artifact_merge_split_nodes_m1_op.py",
+            "- R5 - R3": "artifact_merge_split_nodes_m2_op.py",
+        },
+        "IPU": {
+            "OP": "artifact_merge_split_nodes_IPU_op.py",
+            "- R5": "artifact_merge_split_nodes_m1_IPU_op.py",
+            "- R5 - R3": "artifact_merge_split_nodes_m2_IPU_op.py",
+        },
+    },
     
-    # # DONE
-    # "Multi-keys (diff pkt field)": {
-    #     "Tofino": {
-    #         "OP": "artifact_multiple_field_key_op.py",
-    #         "+ R5": "artifact_multiple_field_key_m1_op.py",
-    #         "- R5": "artifact_multiple_field_key_m2_op.py",
-    #     },
-    #     "IPU": {
-    #         "OP": "artifact_multiple_field_key_IPU_op.py",
-    #         "- R5": "artifact_multiple_field_key_m1_IPU_op.py",
-    #         "+ R5": "artifact_multiple_field_key_m2_IPU_op.py",
-    #     },
-    # },
+    # DONE
+    "Multi-keys (diff pkt field)": {
+        "Tofino": {
+            "OP": "artifact_multiple_field_key_op.py",
+            "+ R5": "artifact_multiple_field_key_m1_op.py",
+            "- R5": "artifact_multiple_field_key_m2_op.py",
+        },
+        "IPU": {
+            "OP": "artifact_multiple_field_key_IPU_op.py",
+            "- R5": "artifact_multiple_field_key_m1_IPU_op.py",
+            "+ R5": "artifact_multiple_field_key_m2_IPU_op.py",
+        },
+    },
 
-    # # DONE
-    # "Pure Extraction states": {
-    #     "Tofino": {
-    #         "OP":  "artifact_merge_pure_extraction_op.py",
-    #         "+ state merging":  "artifact_merge_pure_extraction_m1_op.py",
-    #     },
-    #     "IPU": {
-    #         "OP":  "artifact_merge_pure_extraction_IPU_op.py",
-    #         "+ state merging":  "artifact_merge_pure_extraction_m1_IPU_op.py",
-    #     },
-    # },
+    # DONE
+    "Pure Extraction states": {
+        "Tofino": {
+            "OP":  "artifact_merge_pure_extraction_op.py",
+            "+ state merging":  "artifact_merge_pure_extraction_m1_op.py",
+        },
+        "IPU": {
+            "OP":  "artifact_merge_pure_extraction_IPU_op.py",
+            "+ state merging":  "artifact_merge_pure_extraction_m1_IPU_op.py",
+        },
+    },
 
     # # DONE
     # "Sai V1": {
