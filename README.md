@@ -1,6 +1,6 @@
 # ParserHawk
 
-This repository contains the artifact for the ACM SIGCOMM '25 paper "ParserHawk: Hardware-aware parser generator using program synthesis".
+This repository contains the artifact for the ACM SIGCOMM '25 paper "[ParserHawk: Hardware-aware parser generator using program synthesis](https://github.com/ParserHawk/ParserHawk/blob/main/ParserHawk.pdf)".
 The artifact consists of scripts to reproduce experiment results from the paper.
 
 ## Getting Started
