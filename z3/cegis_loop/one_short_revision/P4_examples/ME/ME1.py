@@ -40,7 +40,7 @@ key_field_list = [4, 0]
 num_pkt_fields = len(pkt_field_size_list)
 
 # List the hardware configuration
-lookahead_window_size = 2
+lookahead_window_size = 0
 size_of_key = 4
 num_parser_nodes = 2
 tcam_num = 3
@@ -211,9 +211,6 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
     Out_Fields, post_pos, idx = new_node(0, Flags[0], Out_Fields, Input_bitstream, 
                                                                         idx=idx, pos=post_pos, alloc_matrix=alloc_matrix, 
                                                                         Lookahead=Lookahead, 
-                                                                        # key_val_list=key_val_2D_list[0], 
-                                                                        # key_mask_list=key_mask_2D_list[0], 
-                                                                        # tran_idx_list=tran_idx_2D_list[0],
                                                                         assignments=assignments,
                                                                         key_val_total_list=key_val_total_list, 
                                                                         key_mask_total_list=key_mask_total_list, 
@@ -228,9 +225,6 @@ def implementation(Flags, Input_bitstream, idx, pos, random_initial_value_list,
                 i, Flags[i], Out_Fields, Input_bitstream, 
                 idx=idx, pos=post_pos, alloc_matrix=alloc_matrix, 
                 Lookahead=Lookahead, 
-                # key_val_list=key_val_2D_list[0], 
-                # key_mask_list=key_mask_2D_list[0], 
-                # tran_idx_list=tran_idx_2D_list[0],
                 assignments=assignments,
                 key_val_total_list=key_val_total_list, 
                 key_mask_total_list=key_mask_total_list, 
@@ -553,13 +547,13 @@ def cegis_loop():
             print("current output:", p4_in_json)
             exit(0)
         if cexample is None:
-            # print("Final output:", p4_in_json)
+            print("Final output:", p4_in_json)
             print(f"Valid function found")
             print(f"Synthesis time: {synthesis_time:.2f}s, Verification time: {verification_time:.2f}s, total_iterations = {i+1}, search_space_bit = {search_space_bit}")
             print(f"num of TCAM entry: {tcam_num}")
             return
         else:
-            # print(f"Counterexample found: x = {cexample}")
+            print(f"Counterexample found: x = {cexample}")
             cexamples.append(cexample)  # Add the counterexample for the next round
             # this is not necessary but I do this for debuging purpose TODO: remove the next line
             cexamples = sorted(cexamples)

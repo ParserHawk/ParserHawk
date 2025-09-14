@@ -41,11 +41,11 @@ num_pkt_fields = len(pkt_field_size_list)
 
 # List the hardware configuration
 lookahead_window_size = 2
-size_of_key = 4
-num_parser_nodes = 2
-tcam_num = 2
+size_of_key = 2
+num_parser_nodes = 3
+tcam_num = 3
 
-num_of_tcam_visit = 1
+num_of_tcam_visit = 2
 
 # TODO: should generate the specification automatically
 # Input: Input_bitstream with the type bitVec var in z3, and initial value of all fields
@@ -343,12 +343,12 @@ def synthesis_step(cexamples):
     
     tran_idx_total_list = [Int(f'tran_idx{i}') for i in range(tcam_num)]
 
-    for i in range(tcam_num):
-        s.add(Or(key_val_total_list[i] == 0, key_val_total_list[i] == 12))
+    # for i in range(tcam_num):
+    #     s.add(Or(key_val_total_list[i] == 0, key_val_total_list[i] == 12))
     
-    for i in range(len(alloc_matrix)):
-        for j in range(len(alloc_matrix[i]) - 1):
-            s.add(alloc_matrix[i][j] == alloc_matrix[i][j + 1])
+    # for i in range(len(alloc_matrix)):
+    #     for j in range(len(alloc_matrix[i]) - 1):
+    #         s.add(alloc_matrix[i][j] == alloc_matrix[i][j + 1])
     # Update search space
     if not has_run:
         for i in range(len(Flags)): # Flags
@@ -368,8 +368,8 @@ def synthesis_step(cexamples):
     # for i in range(tcam_num - 1):
     #     constraints.append(assignments[i] <= assignments[i + 1])
     s.add(constraints)
-    s.add(Flags[0][0] == 1)
-    s.add(Flags[1][1] == 1)
+    # s.add(Flags[0][0] == 1)
+    # s.add(Flags[1][1] == 1)
     
     if not cexamples:
         # We force the counterexample set to be non-empty

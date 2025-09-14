@@ -15,10 +15,9 @@ from practical_ex.code_gen_big_tcam import *
 """
 spec:
 state ethernet {
-    b.extract(hdr.data);  --> 4-bit
+    b.extract(hdr.data);  --> 8-bit
     transition select(hdr.data.f33) {
-        0b1100, 0x0000: parse_llc_header;
-        default: accept;
+        default: parse_llc_header;
     }
 }
 state parse_llc_header {
@@ -33,17 +32,17 @@ total_iterations = 0
 has_run = False  # global guard
 search_space_bit = 0
 
-input_bit_stream_size = 4+1
+input_bit_stream_size = 8+1
 
-pkt_field_size_list = [4, 1]
-key_field_list = [4, 0]
+pkt_field_size_list = [8, 1]
+key_field_list = [8, 0]
 num_pkt_fields = len(pkt_field_size_list)
 
 # List the hardware configuration
 lookahead_window_size = 2
-size_of_key = 4
+size_of_key = 8
 num_parser_nodes = 2
-tcam_num = 2
+tcam_num = 1
 
 num_of_tcam_visit = 1
 
@@ -57,8 +56,7 @@ def specification(Input_bitstream, initial_field_val_list):
     #  idx 13 12 11 10 9 8 
     # 0xC, 0x0, 0x1111 : data1,
     O_field0 = Extract(input_bit_stream_size - 1, input_bit_stream_size - 1 - pkt_field_size_list[0] + 1, Input_bitstream) #node 0
-    Cond = (O_field0 == BitVecVal(12, 4)) or (O_field0 == BitVecVal(0, 4))
-    O_field1 = If(Cond, Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream), initial_field_val_list[1])
+    O_field1 = Extract(input_bit_stream_size - 1 - pkt_field_size_list[0], input_bit_stream_size - 1 - pkt_field_size_list[0] - pkt_field_size_list[1] + 1, Input_bitstream)
     
     return [O_field0, O_field1]
 
@@ -68,8 +66,7 @@ def spec(Input_bitstream, initial_list):
     # l = [int(Input_bitstream[0 : 4], 2), int(Input_bitstream[4 : 8], 2)
     Fields = ["" for _ in range(num_pkt_fields)]
     Fields[0] = Input_bitstream[0 : pkt_field_size_list[0]]
-    if int(Fields[0], 2) == 12 or int(Fields[0], 2) == 0:
-        Fields[1] = Input_bitstream[pkt_field_size_list[0] : pkt_field_size_list[0] + pkt_field_size_list[1]]
+    Fields[1] = Input_bitstream[pkt_field_size_list[0] : pkt_field_size_list[0] + pkt_field_size_list[1]]
     l = []
     for i in range(num_pkt_fields):
         if Fields[i] != "":
