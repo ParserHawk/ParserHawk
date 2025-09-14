@@ -52,7 +52,7 @@ for prog_name in all_programs:
 
 
 
-with open("tcam_results.csv", "w", newline="") as f:
+with open("table4_ParserHawk.csv", "w", newline="") as f:
     writer = csv.writer(f)
     writer.writerow(["Program", "# TCAM (ParserHawk)"])  # 表头
     writer.writerows(columns)

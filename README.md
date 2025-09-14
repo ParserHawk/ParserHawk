@@ -35,6 +35,11 @@ source setup/env_setup.sh
 ```
 python3 table4.py
 ```
+Print results into table4_ParserHawk.csv using the following command.
+```
+cd z3/cegis_loop/one_short_revision/P4_examples
+python3 table4_ParserHawk.py
+```
 * Table 5: 
 Print results into table5.csv using the following command.
 ``` 
